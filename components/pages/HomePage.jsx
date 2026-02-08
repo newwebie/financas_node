@@ -252,11 +252,11 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Período da Fatura */}
-      <div className="flex items-center justify-between">
+      {/* Período da Fatura (desktop only) */}
+      <div className="hidden md:flex items-center justify-between">
         <div>
-          <p className="text-white/40 text-[10px] md:text-xs font-medium">Período da Fatura</p>
-          <p className="text-white/60 text-xs md:text-sm">
+          <p className="text-white/40 text-xs font-medium">Período da Fatura</p>
+          <p className="text-white/60 text-sm">
             {formatDateFull(periodo.dataInicio)} - {formatDateFull(periodo.dataFim)}
           </p>
         </div>
@@ -302,7 +302,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
               <Coins size={20} className="text-peach-400 hidden md:block" />
             </div>
             <span className="text-peach-400 text-[10px] md:text-xs font-medium px-1.5 py-0.5 md:px-2 md:py-1 bg-peach-500/10 rounded-lg">
-              Investimentos
+              Extras
             </span>
           </div>
           <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1">Renda Variável</p>
@@ -332,29 +332,33 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
           <h3 className="text-white font-semibold text-xs md:text-base mb-3 md:mb-6">Distribuição de Gastos</h3>
           {chartData.length > 0 ? (
             <div>
-              <ResponsiveContainer width="100%" height={160} className="md:!h-[220px]">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="35%"
-                    outerRadius="55%"
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2 mt-2 md:mt-4">
+              <div className="flex justify-center">
+                <div className="w-[160px] h-[160px] md:w-[280px] md:h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="35%"
+                        outerRadius="80%"
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1 md:gap-2 mt-2 md:mt-4">
                 {chartData.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-1.5 md:gap-2">
                     <div className="w-2 h-2 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-white/60 text-[10px] md:text-xs truncate">{item.name}</span>
+                    <span className="text-white/60 text-[8px] md:text-xs truncate">{item.name}</span>
                   </div>
                 ))}
               </div>
@@ -438,7 +442,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
               )}
             </div>
           ) : (
-            <div className="h-[160px] md:h-[220px] flex items-center justify-center">
+            <div className="h-[160px] md:h-[280px] flex items-center justify-center">
               <p className="text-white/30 text-[10px] md:text-sm">Nenhuma despesa no período</p>
             </div>
           )}

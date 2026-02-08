@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { getUserColors, getOtherUser } from '@/lib/helpers'
+import { getUserColors, getOtherUser, calcPeriodoFatura } from '@/lib/helpers'
 import Sidebar from '@/components/Sidebar'
 import HomePage from '@/components/pages/HomePage'
 import NovoPage from '@/components/pages/NovoPage'
@@ -13,6 +13,7 @@ import AmbasPage from '@/components/pages/AmbasPage'
 import EditarPage from '@/components/pages/EditarPage'
 import ConfigPage from '@/components/pages/ConfigPage'
 import { Menu } from 'lucide-react'
+import Image from 'next/image'
 
 const PAGES = [
   { id: 'home', icon: 'Home', label: 'Início' },
@@ -33,12 +34,18 @@ export default function AppShell({ user, onSwitchUser }) {
   const [editItemId, setEditItemId] = useState(null)
   const [acertoFocus, setAcertoFocus] = useState(null)
   const [perfilConfig, setPerfilConfig] = useState({ Susanna: null, Pietrah: null })
+  const [periodo, setPeriodo] = useState({ dataInicio: null, dataFim: null })
   const colors = getUserColors(user)
   const outro = getOtherUser(user)
 
   useEffect(() => {
     loadPerfilConfig()
   }, [refreshKey])
+
+  useEffect(() => {
+    loadPeriodo()
+  }, [user, refreshKey])
+
 
   async function loadPerfilConfig() {
     try {
@@ -61,6 +68,16 @@ export default function AppShell({ user, onSwitchUser }) {
         Susanna: { tipo: 'emoji', valor: '⚡' },
         Pietrah: { tipo: 'foto', valor: '/avatars/pietrah.png' },
       })
+    }
+  }
+
+  async function loadPeriodo() {
+    try {
+      const config = await fetch(`/api/config?user=${user}`).then(r => r.json())
+      const p = calcPeriodoFatura(config, user, 1)
+      setPeriodo(p)
+    } catch (error) {
+      console.error('Erro ao carregar período:', error)
     }
   }
 
@@ -100,15 +117,27 @@ export default function AppShell({ user, onSwitchUser }) {
   }
 
   return (
-    <div className="min-h-screen bg-base-900 flex">
+    <div className="min-h-screen bg-base-900 flex relative">
+      {/* Background mobile */}
+      <div className="absolute inset-0 md:hidden pointer-events-none">
+        <Image
+          src="/default_background.png"
+          alt=""
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
+
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
       )}
       <Sidebar pages={PAGES} activePage={activePage} onNavigate={handleNavigate}
                isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)}
                user={user} colors={colors} onSwitchUser={onSwitchUser}
-               perfilConfig={perfilConfig} />
-      <main className="flex-1 min-h-screen lg:ml-[72px]">
+               perfilConfig={perfilConfig} periodo={periodo} />
+      <main className="flex-1 min-h-screen lg:ml-[72px] relative z-10">
         <div className="sticky top-0 z-30 bg-base-900/80 backdrop-blur-md border-b border-white/5
                         px-4 py-3 flex items-center justify-between lg:hidden">
           <button onClick={() => setSidebarOpen(true)}

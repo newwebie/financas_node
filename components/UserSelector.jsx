@@ -81,12 +81,20 @@ export default function UserSelector({ onSelect }) {
         <div className="absolute inset-0 bg-black/40" />
       </div>
 
-      {/* Orbes de luz ambiente (desktop only) */}
-      <div className="absolute top-1/4 -left-32 w-64 h-64 bg-su-400/10 rounded-full blur-[100px] pointer-events-none hidden md:block" />
-      <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-pi-400/10 rounded-full blur-[100px] pointer-events-none hidden md:block" />
+      {/* Background desktop */}
+      <div className="absolute inset-0 hidden md:block">
+        <Image
+          src="/background_desktop.png"
+          alt=""
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
 
-      {/* Título */}
-      <div className="text-center mb-16 animate-fade-in">
+      {/* Título (mobile only) */}
+      <div className="text-center mb-16 animate-fade-in md:hidden">
         <h1 className="text-3xl font-semibold text-white tracking-tight">Finanças</h1>
         <p className="text-white/40 text-sm mt-2 font-light">Quem está usando?</p>
       </div>
@@ -122,7 +130,6 @@ export default function UserSelector({ onSelect }) {
         </button>
       </div>
 
-      <p className="absolute bottom-8 text-white/15 text-xs">Finanças Compartilhadas</p>
     </div>
   )
 }

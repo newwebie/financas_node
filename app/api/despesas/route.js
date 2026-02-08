@@ -29,7 +29,7 @@ export async function POST(request) {
       total_value: body.total_value,
       payment_method: body.payment_method,
       installment: body.installment || 0,
-      createdAt: new Date(body.createdAt || Date.now()),
+      createdAt: new Date(body.createdAt ? `${body.createdAt}T12:00:00` : Date.now()),
       pagamento_compartilhado: body.pagamento_compartilhado || 'Pra mim',
       tem_pendencia: body.tem_pendencia || false,
       devedor: body.devedor || null,
@@ -56,7 +56,7 @@ export async function PUT(request) {
     const body = await request.json()
     const colls = await getCollections()
     const { _id, ...data } = body
-    if (data.createdAt) data.createdAt = new Date(data.createdAt)
+    if (data.createdAt) data.createdAt = new Date(`${data.createdAt}T12:00:00`)
     await colls.despesas.updateOne({ _id: new ObjectId(_id) }, { $set: data })
     return NextResponse.json({ success: true })
   } catch (error) {

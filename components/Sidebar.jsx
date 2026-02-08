@@ -1,9 +1,10 @@
 'use client'
 
 import Image from 'next/image'
+import { formatDateFull } from '@/lib/helpers'
 import {
   Home, Plus, Handshake, BarChart3, Fuel, Target,
-  Users, Pencil, Settings, ArrowLeftRight, ChevronLeft, Menu
+  Users, Pencil, Settings, ArrowLeftRight, ChevronLeft, Menu, Calendar
 } from 'lucide-react'
 
 const ICON_MAP = {
@@ -11,7 +12,7 @@ const ICON_MAP = {
   Users, Pencil, Settings,
 }
 
-export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggle, user, colors, onSwitchUser, perfilConfig }) {
+export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggle, user, colors, onSwitchUser, perfilConfig, periodo }) {
   const isSu = user === 'Susanna'
   const perfil = perfilConfig?.[user] || { tipo: 'emoji', valor: isSu ? '⚡' : '👤' }
 
@@ -49,6 +50,17 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
         >
           {renderAvatar(40)}
         </button>
+        {periodo?.dataInicio && (
+          <div className="mb-3 flex flex-col items-center" title="Período da Fatura">
+            <Calendar size={14} className="text-white/30 mb-1" />
+            <p className="text-white/30 text-[8px] leading-tight text-center">
+              {formatDateFull(periodo.dataInicio)?.split(' de ').slice(0, 2).join('/')}
+            </p>
+            <p className="text-white/30 text-[8px] leading-tight text-center">
+              {formatDateFull(periodo.dataFim)?.split(' de ').slice(0, 2).join('/')}
+            </p>
+          </div>
+        )}
         <div className="w-8 h-px bg-white/10 mb-2" />
         {pages.map((page) => {
           const Icon = ICON_MAP[page.icon]
@@ -87,6 +99,17 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
             <ChevronLeft size={16} />
           </button>
         </div>
+        {periodo?.dataInicio && (
+          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
+            <Calendar size={14} className="text-white/30 flex-shrink-0" />
+            <div>
+              <p className="text-white/30 text-[10px] font-medium">Período da Fatura</p>
+              <p className="text-white/50 text-xs">
+                {formatDateFull(periodo.dataInicio)} - {formatDateFull(periodo.dataFim)}
+              </p>
+            </div>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto py-3 px-3">
           {pages.map((page) => {
             const Icon = ICON_MAP[page.icon]

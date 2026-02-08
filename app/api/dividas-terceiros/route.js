@@ -23,8 +23,8 @@ export async function POST(request) {
     const colls = await getCollections()
     const result = await colls.dividas_terceiros.insertOne({
       devedor: body.devedor, credor: body.credor, valor: body.valor,
-      descricao: body.descricao || '', data_emprestimo: new Date(body.data_emprestimo || Date.now()),
-      data_pagamento: new Date(body.data_pagamento), status: 'em aberto',
+      descricao: body.descricao || '', data_emprestimo: new Date(body.data_emprestimo ? `${body.data_emprestimo}T12:00:00` : Date.now()),
+      data_pagamento: new Date(`${body.data_pagamento}T12:00:00`), status: 'em aberto',
       emprestimo_conta: body.emprestimo_conta || false,
     })
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
@@ -38,8 +38,8 @@ export async function PUT(request) {
     const body = await request.json()
     const colls = await getCollections()
     const { _id, ...data } = body
-    if (data.data_emprestimo) data.data_emprestimo = new Date(data.data_emprestimo)
-    if (data.data_pagamento) data.data_pagamento = new Date(data.data_pagamento)
+    if (data.data_emprestimo) data.data_emprestimo = new Date(`${data.data_emprestimo}T12:00:00`)
+    if (data.data_pagamento) data.data_pagamento = new Date(`${data.data_pagamento}T12:00:00`)
     if (data.status === 'quitado') data.data_quitacao = new Date()
     await colls.dividas_terceiros.updateOne({ _id: new ObjectId(_id) }, { $set: data })
     return NextResponse.json({ success: true })

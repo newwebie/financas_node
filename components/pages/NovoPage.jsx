@@ -14,6 +14,11 @@ const TIPOS = [
   { id: 'conta-fixa', label: 'Conta Fixa', icon: Receipt, emoji: '📄' },
 ]
 
+function getLocalDate() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 export default function NovoPage({ user, outro, colors, refreshKey, triggerRefresh }) {
   const [tipo, setTipo] = useState(null) // Começa null para mostrar seleção
   const [loading, setLoading] = useState(false)
@@ -24,12 +29,12 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
   // Form Abastecimento Moto
   const [valorMoto, setValorMoto] = useState('30.00')
   const [pagamentoMoto, setPagamentoMoto] = useState('Debito')
-  const [dataMoto, setDataMoto] = useState(new Date().toISOString().split('T')[0])
+  const [dataMoto, setDataMoto] = useState(getLocalDate())
 
   // Form Abastecimento Carro
   const [valorCarro, setValorCarro] = useState('60.00')
   const [pagamentoCarro, setPagamentoCarro] = useState('Debito')
-  const [dataCarro, setDataCarro] = useState(new Date().toISOString().split('T')[0])
+  const [dataCarro, setDataCarro] = useState(getLocalDate())
 
   // Form Gasto
   const [categoria, setCategoria] = useState('Comida')
@@ -40,7 +45,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
   const [pagamento, setPagamento] = useState('Debito')
   const [tipoCompra, setTipoCompra] = useState('Pra mim')
   const [parcelas, setParcelas] = useState(0)
-  const [dataGasto, setDataGasto] = useState(new Date().toISOString().split('T')[0])
+  const [dataGasto, setDataGasto] = useState(getLocalDate())
 
   // Form Emprestei
   const [pessoaEmprestei, setPessoaEmprestei] = useState('')
@@ -82,7 +87,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
     setQuantidade(1)
     setPreco('')
     setParcelas(0)
-    setDataGasto(new Date().toISOString().split('T')[0])
+    setDataGasto(getLocalDate())
     setPessoaEmprestei('')
     setValorEmprestei('')
     setDescricaoEmprestei('')
@@ -273,7 +278,27 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
       })
 
       if (res.ok) {
-        showFeedback('Abastecimento Moto registrado!')
+        let emailEnviado = false
+        try {
+          const emailRes = await fetch('/api/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'abastecimento',
+              quemAbasteceu: user,
+              veiculo: 'Moto',
+              valor: parseFloat(valorMoto),
+            }),
+          })
+          const emailData = await emailRes.json()
+          emailEnviado = emailData.success
+        } catch (emailError) {
+          console.log('Email nao enviado:', emailError)
+        }
+        // Verifica lembretes de emprestimo (fire-and-forget)
+        fetch('/api/verificar-lembretes').catch(() => {})
+
+        showFeedback(emailEnviado ? 'Registrado! Email enviado' : 'Abastecimento Moto registrado!')
         setValorMoto('30.00')
         setExpandMoto(false)
         triggerRefresh()
@@ -311,7 +336,27 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
       })
 
       if (res.ok) {
-        showFeedback('Abastecimento Carro registrado!')
+        let emailEnviado = false
+        try {
+          const emailRes = await fetch('/api/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'abastecimento',
+              quemAbasteceu: user,
+              veiculo: 'Carro',
+              valor: parseFloat(valorCarro),
+            }),
+          })
+          const emailData = await emailRes.json()
+          emailEnviado = emailData.success
+        } catch (emailError) {
+          console.log('Email nao enviado:', emailError)
+        }
+        // Verifica lembretes de emprestimo (fire-and-forget)
+        fetch('/api/verificar-lembretes').catch(() => {})
+
+        showFeedback(emailEnviado ? 'Registrado! Email enviado' : 'Abastecimento Carro registrado!')
         setValorCarro('100.00')
         setExpandCarro(false)
         triggerRefresh()
