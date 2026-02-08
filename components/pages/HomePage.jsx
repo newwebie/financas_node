@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { fmt, formatDateFull, getCategoryDisplay, calcPeriodoFatura, CATEGORIAS } from '@/lib/helpers'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, Coins, AlertCircle, CheckCircle, ArrowUpRight, ArrowDownRight, ChevronDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
-export default function HomePage({ user, outro, colors, refreshKey, triggerRefresh, openEditItem }) {
+export default function HomePage({ user, outro, colors, refreshKey, triggerRefresh, openEditItem, openAcerto }) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState({
     despesas: [],
@@ -149,7 +149,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     const chartColors = ['#f472b6', '#60a5fa', '#6ee7b7', '#fdba74', '#c4b5fd', '#94a3b8']
 
     const chartDataTemp = top5.map((cat, idx) => ({
-      name: getCategoryDisplay(cat.categoria),
+      name: CATEGORIAS.find(c => c.id === cat.categoria)?.label || cat.categoria,
       value: cat.valor,
       color: chartColors[idx % chartColors.length]
     }))
@@ -191,13 +191,17 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       .filter(d => d.status === 'em aberto')
       .reduce((sum, d) => sum + d.valor, 0)
 
+    const dividasPessoais = emprestimos
+      .filter(e => e.status === 'em aberto' && e.de === outro)
+      .reduce((sum, e) => sum + e.valor, 0)
+
     const emprestimosTerceirosTotal = emprestimosTerceiros
       .filter(e => e.status === 'em aberto')
       .reduce((sum, e) => sum + e.valor, 0)
 
     setSituacao({
       saldo,
-      dividasTerceiros: dividasTerceirosTotal,
+      dividasTerceiros: dividasTerceirosTotal + dividasPessoais,
       emprestimosTerceiros: emprestimosTerceirosTotal,
     })
   }
@@ -440,14 +444,20 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
           <div className="space-y-4">
             {categorias.slice(0, 3).map((cat, idx) => {
               const percent = stats.gastos > 0 ? (cat.valor / stats.gastos) * 100 : 0
-              const medals = ['🥇', '🥈', '🥉']
+              const rankColors = [
+                'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                'bg-slate-400/20 text-slate-300 border-slate-400/30',
+                'bg-orange-400/20 text-orange-300 border-orange-400/30',
+              ]
               return (
                 <div key={cat.categoria} className="flex items-center gap-4">
-                  <span className="text-3xl">{medals[idx]}</span>
+                  <div className={`w-9 h-9 rounded-xl border flex items-center justify-center text-sm font-bold flex-shrink-0 ${rankColors[idx]}`}>
+                    {idx + 1}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white text-sm font-medium truncate">
-                        {getCategoryDisplay(cat.categoria)}
+                        {CATEGORIAS.find(c => c.id === cat.categoria)?.label || cat.categoria}
                       </p>
                       <p className="text-white/60 text-xs ml-2">{percent.toFixed(0)}%</p>
                     </div>
@@ -474,7 +484,9 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       {/* Financial Health Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Saldo com outra pessoa */}
-        <div className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 ${
+        <div
+          onClick={() => openAcerto && openAcerto('pendentes')}
+          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.saldo > 0 ? 'border-mint-500/30' : situacao.saldo < 0 ? 'border-coral-500/30' : 'border-white/5'
         }`}>
           <div className="flex items-center gap-3 mb-3">
@@ -483,7 +495,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
             ) : situacao.saldo < 0 ? (
               <ArrowDownRight className="text-coral-400" size={20} />
             ) : (
-              <CheckCircle className="text-white/40" size={20} />
+              <CircleCheck className="text-white/40" size={20} />
             )}
             <p className="text-white/60 text-xs font-medium">
               {situacao.saldo > 0 ? `${outro} te deve` : situacao.saldo < 0 ? `Você deve` : 'Acertos'}
@@ -496,13 +508,15 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
           </p>
         </div>
 
-        {/* Dívidas a Terceiros */}
-        <div className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 ${
+        {/* Dívidas */}
+        <div
+          onClick={() => openAcerto && openAcerto('dividas')}
+          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.dividasTerceiros > 0 ? 'border-peach-500/30' : 'border-white/5'
         }`}>
           <div className="flex items-center gap-3 mb-3">
-            <AlertCircle className={situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} size={20} />
-            <p className="text-white/60 text-xs font-medium">Dívidas a Terceiros</p>
+            <CircleAlert className={situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} size={20} />
+            <p className="text-white/60 text-xs font-medium">Dívidas</p>
           </div>
           <p className={`text-2xl font-bold ${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'}`}>
             {situacao.dividasTerceiros > 0 ? fmt(situacao.dividasTerceiros) : 'Nenhuma'}
@@ -510,7 +524,9 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         </div>
 
         {/* Empréstimos a Terceiros */}
-        <div className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 ${
+        <div
+          onClick={() => openAcerto && openAcerto('emprestimos')}
+          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.emprestimosTerceiros > 0 ? 'border-lavender-500/30' : 'border-white/5'
         }`}>
           <div className="flex items-center gap-3 mb-3">
@@ -526,7 +542,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       {/* Recent Transactions */}
       {recentTransactions.length > 0 && (
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-6">
-          <h3 className="text-white font-semibold mb-4">Transações Recentes</h3>
+          <h3 className="text-white font-semibold mb-4">Atividades Recentes</h3>
           <div className="space-y-3">
             {recentTransactions.map((txn) => (
               <button

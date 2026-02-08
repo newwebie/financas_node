@@ -31,6 +31,7 @@ export default function AppShell({ user, onSwitchUser }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [editItemId, setEditItemId] = useState(null)
+  const [acertoFocus, setAcertoFocus] = useState(null)
   const [perfilConfig, setPerfilConfig] = useState({ Susanna: null, Pietrah: null })
   const colors = getUserColors(user)
   const outro = getOtherUser(user)
@@ -74,14 +75,20 @@ export default function AppShell({ user, onSwitchUser }) {
     setSidebarOpen(false)
   }, [])
 
+  const openAcerto = useCallback((section) => {
+    setAcertoFocus(section)
+    setActivePage('acerto')
+    setSidebarOpen(false)
+  }, [])
+
   const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), [])
 
   function renderPage() {
     const props = { user, outro, colors, refreshKey, triggerRefresh }
     switch (activePage) {
-      case 'home': return <HomePage {...props} openEditItem={openEditItem} />
+      case 'home': return <HomePage {...props} openEditItem={openEditItem} openAcerto={openAcerto} />
       case 'novo': return <NovoPage {...props} />
-      case 'acerto': return <AcertoPage {...props} />
+      case 'acerto': return <AcertoPage {...props} focusSection={acertoFocus} clearFocus={() => setAcertoFocus(null)} />
       case 'relatorio': return <RelatorioPage {...props} />
       case 'combustivel': return <CombustivelPage {...props} />
       case 'metas': return <MetasPage {...props} />

@@ -1,79 +1,168 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { SectionTitle, Skeleton } from '@/components/ui/Cards'
-import { fmt, formatDateFull, getCategoryDisplay, CATEGORIES } from '@/lib/helpers'
-import { ChevronDown, Save, Trash2, Check, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Skeleton, EmptyState, Badge } from '@/components/ui/Cards'
+import { fmt, formatDateFull, formatDate, getCategoryEmoji, getCategoryDisplay, CATEGORIES, CATEGORIAS, PAYMENT_METHODS, STATUS_TERCEIROS } from '@/lib/helpers'
+import { ChevronDown, Save, Trash2, Check, CircleAlert, Search, X, ArrowDown, ArrowUp } from 'lucide-react'
 
-const TIPOS = [
-  { id: 'despesas', label: 'Despesas', endpoint: '/api/despesas' },
-  { id: 'combustivel', label: 'Combustível', endpoint: '/api/despesas', filter: (d) => d.label === 'Combustivel' },
-  { id: 'emprestimos', label: 'Emprestei', endpoint: '/api/emprestimos' },
-  { id: 'dividas', label: 'Dívidas', endpoint: '/api/emprestimos', filter: (e) => e.de === 'user' },
-  { id: 'contas-fixas', label: 'Contas Fixas', endpoint: '/api/contas-fixas' },
-  { id: 'metas', label: 'Metas', endpoint: '/api/metas' },
+// Pseudo-categorias para tipos que nao sao despesas
+const EXTRA_CATEGORIAS = [
+  { id: '_emprestimo_pessoal', emoji: '🤝', label: 'Empréstimo Pessoal' },
+  { id: '_contas_fixas', emoji: '📄', label: 'Contas Fixas' },
+  { id: '_metas', emoji: '🎯', label: 'Metas' },
+  { id: '_emprestimo_terceiros', emoji: '🏦', label: 'Empréstimo (3os)' },
+  { id: '_dividas_terceiros', emoji: '📝', label: 'Dívidas (3os)' },
 ]
+
+const ALL_CATEGORIAS = [...CATEGORIAS, ...EXTRA_CATEGORIAS]
 
 export default function EditarPage({ user, outro, colors, refreshKey, triggerRefresh, editItemId, clearEditItemId }) {
   const [loading, setLoading] = useState(true)
-  const [tipo, setTipo] = useState('despesas')
-  const [items, setItems] = useState([])
+  const [allItems, setAllItems] = useState([])
   const [expandedId, setExpandedId] = useState(null)
   const [editData, setEditData] = useState({})
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
 
-  useEffect(() => {
-    loadData()
-  }, [tipo, user, refreshKey])
+  // Search & Filters
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState({ categoria: null, pagamento: null, status: null, mes: null })
+  const [sortBy, setSortBy] = useState('date')
+  const [sortDir, setSortDir] = useState('desc')
+  const [openFilter, setOpenFilter] = useState(null)
+
+  useEffect(() => { loadAllData() }, [user, refreshKey])
 
   useEffect(() => {
-    if (editItemId && items.length > 0) {
-      const item = items.find(i => i._id === editItemId)
+    if (editItemId && allItems.length > 0) {
+      const item = allItems.find(i => i._id === editItemId)
       if (item) {
         setExpandedId(editItemId)
         setEditData({ ...item })
       }
       if (clearEditItemId) clearEditItemId()
     }
-  }, [editItemId, items])
+  }, [editItemId, allItems])
 
-  async function loadData() {
+  useEffect(() => {
+    if (!openFilter) return
+    const handler = () => setOpenFilter(null)
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [openFilter])
+
+  async function loadAllData() {
     setLoading(true)
     setExpandedId(null)
     try {
-      const tipoConfig = TIPOS.find(t => t.id === tipo)
-      let url = tipoConfig.endpoint
+      const [despesas, emprestimos, contasFixas, metas, empTerceiros, divTerceiros] = await Promise.all([
+        fetch(`/api/despesas?buyer=${user}`).then(r => r.json()).catch(() => []),
+        fetch(`/api/emprestimos`).then(r => r.json()).catch(() => []),
+        fetch(`/api/contas-fixas`).then(r => r.json()).catch(() => []),
+        fetch(`/api/metas?user=${user}`).then(r => r.json()).catch(() => []),
+        fetch(`/api/emprestimos-terceiros?user=${user}&status=all`).then(r => r.json()).catch(() => []),
+        fetch(`/api/dividas-terceiros?user=${user}&status=all`).then(r => r.json()).catch(() => []),
+      ])
 
-      // Adicionar filtros de query
-      if (tipo === 'despesas' || tipo === 'combustivel') {
-        url += `?buyer=${user}`
-      } else if (tipo === 'metas') {
-        url += `?user=${user}`
-      } else if (tipo === 'contas-fixas') {
-        // Sem filtro, busca todas
-      }
+      const items = []
 
-      const data = await fetch(url).then(r => r.json())
+      // Despesas - cada uma ja tem label como categoria
+      despesas.forEach(d => {
+        items.push({ ...d, _tipo: 'despesas', _categoria: d.label, _endpoint: '/api/despesas', _date: d.createdAt, _value: d.total_value })
+      })
 
-      // Aplicar filtros adicionais
-      let filtered = data
-      if (tipoConfig.filter) {
-        filtered = data.filter(tipoConfig.filter)
-      }
+      // Emprestimos pessoais (entre usuarios) - quem emprestou
+      emprestimos.filter(e => e.de === user).forEach(e => {
+        items.push({ ...e, _tipo: 'emprestimos', _categoria: '_emprestimo_pessoal', _endpoint: '/api/emprestimos', _date: e.createdAt, _value: e.valor })
+      })
 
-      // Filtrar por user em contas-fixas
-      if (tipo === 'contas-fixas') {
-        filtered = filtered.filter(c => c.buyer === user)
-      }
+      // Emprestimos pessoais - quem deve
+      emprestimos.filter(e => e.para === user).forEach(e => {
+        items.push({ ...e, _tipo: 'dividas', _categoria: '_emprestimo_pessoal', _endpoint: '/api/emprestimos', _date: e.createdAt, _value: e.valor })
+      })
 
-      setItems(filtered)
+      // Contas fixas
+      contasFixas.filter(c => c.buyer === user).forEach(c => {
+        items.push({ ...c, _tipo: 'contas-fixas', _categoria: '_contas_fixas', _endpoint: '/api/contas-fixas', _date: null, _value: c.valor })
+      })
+
+      // Metas
+      metas.forEach(m => {
+        items.push({ ...m, _tipo: 'metas', _categoria: '_metas', _endpoint: '/api/metas', _date: null, _value: m.limite })
+      })
+
+      // Emprestimos terceiros
+      empTerceiros.forEach(e => {
+        items.push({ ...e, _tipo: 'emprestimos-terceiros', _categoria: '_emprestimo_terceiros', _endpoint: '/api/emprestimos-terceiros', _date: e.data_emprestimo, _value: e.valor })
+      })
+
+      // Dividas terceiros
+      divTerceiros.forEach(d => {
+        items.push({ ...d, _tipo: 'dividas-terceiros', _categoria: '_dividas_terceiros', _endpoint: '/api/dividas-terceiros', _date: d.data_emprestimo, _value: d.valor })
+      })
+
+      setAllItems(items)
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  const displayedItems = useMemo(() => {
+    let result = [...allItems]
+
+    // Search - busca em todos os campos relevantes
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(item => {
+        const fields = [item.item, item.description, item.descricao, item.label, item.nome, item.para, item.de, item.devedor, item.credor, item.categoria]
+        return fields.some(f => String(f || '').toLowerCase().includes(q))
+      })
+    }
+
+    // Category filter
+    if (filters.categoria) {
+      result = result.filter(item => item._categoria === filters.categoria)
+    }
+
+    // Payment filter
+    if (filters.pagamento) {
+      result = result.filter(item => item.payment_method === filters.pagamento)
+    }
+
+    // Status filter
+    if (filters.status) {
+      result = result.filter(item => item.status === filters.status)
+    }
+
+    // Month filter
+    if (filters.mes) {
+      result = result.filter(item => {
+        if (!item._date) return false
+        const d = new Date(item._date)
+        const itemMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        return itemMonth === filters.mes
+      })
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let cmp = 0
+      if (sortBy === 'date') {
+        cmp = new Date(a._date || 0) - new Date(b._date || 0)
+      } else if (sortBy === 'value') {
+        cmp = (a._value || 0) - (b._value || 0)
+      } else if (sortBy === 'name') {
+        const nameA = (a.item || a.nome || a.para || a.de || a.devedor || a.credor || a.categoria || '').toLowerCase()
+        const nameB = (b.item || b.nome || b.para || b.de || b.devedor || b.credor || b.categoria || '').toLowerCase()
+        cmp = nameA.localeCompare(nameB)
+      }
+      return sortDir === 'desc' ? -cmp : cmp
+    })
+
+    return result
+  }, [allItems, searchQuery, filters, sortBy, sortDir])
 
   function handleExpand(item) {
     if (expandedId === item._id) {
@@ -85,20 +174,27 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
     }
   }
 
-  async function handleSave(id) {
+  function toggleSort(field) {
+    if (sortBy === field) {
+      setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    } else {
+      setSortBy(field)
+      setSortDir('desc')
+    }
+  }
+
+  async function handleSave(item) {
     setSaving(true)
     try {
-      const tipoConfig = TIPOS.find(t => t.id === tipo)
-      const res = await fetch(tipoConfig.endpoint, {
+      const res = await fetch(item._endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...editData, _id: id }),
+        body: JSON.stringify({ ...editData, _id: item._id }),
       })
-
       if (res.ok) {
         showToast('Salvo com sucesso!', 'success')
         setExpandedId(null)
-        await loadData()
+        await loadAllData()
         triggerRefresh()
       } else {
         showToast('Erro ao salvar', 'error')
@@ -111,19 +207,14 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(item) {
     if (!confirm('Tem certeza que deseja excluir?')) return
-
     try {
-      const tipoConfig = TIPOS.find(t => t.id === tipo)
-      const res = await fetch(`${tipoConfig.endpoint}?id=${id}`, {
-        method: 'DELETE',
-      })
-
+      const res = await fetch(`${item._endpoint}?id=${item._id}`, { method: 'DELETE' })
       if (res.ok) {
         showToast('Excluído com sucesso!', 'success')
         setExpandedId(null)
-        await loadData()
+        await loadAllData()
         triggerRefresh()
       } else {
         showToast('Erro ao excluir', 'error')
@@ -139,74 +230,115 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
     setTimeout(() => setToast(null), 3000)
   }
 
+  function getMonthOptions() {
+    const months = []
+    const now = new Date()
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
+      months.push({ value, label })
+    }
+    return months
+  }
+
+  function getItemDisplay(item) {
+    const tipo = item._tipo
+    switch (tipo) {
+      case 'despesas':
+        return {
+          name: item.item || item.label || 'Item',
+          emoji: getCategoryEmoji(item.label),
+          value: item.total_value,
+          meta: [item.payment_method, item.createdAt ? formatDate(item.createdAt) : null, item.installment > 1 ? `${item.installment}x` : null].filter(Boolean).join(' · '),
+        }
+      case 'contas-fixas':
+        return {
+          name: item.nome || 'Conta',
+          emoji: '📄',
+          value: item.valor,
+          meta: [item.payment_method, item.dia_vencimento ? `Dia ${item.dia_vencimento}` : null].filter(Boolean).join(' · '),
+        }
+      case 'metas':
+        return {
+          name: getCategoryDisplay(item.categoria) || 'Meta',
+          emoji: getCategoryEmoji(item.categoria),
+          value: item.limite,
+          meta: 'Limite mensal',
+        }
+      case 'emprestimos':
+        return {
+          name: `Emprestei p/ ${item.para || '?'}`,
+          emoji: '🤝',
+          value: item.valor,
+          meta: item.createdAt ? formatDate(item.createdAt) : '',
+        }
+      case 'dividas':
+        return {
+          name: `Devo p/ ${item.de || '?'}`,
+          emoji: '🤝',
+          value: item.valor,
+          meta: item.createdAt ? formatDate(item.createdAt) : '',
+        }
+      case 'emprestimos-terceiros':
+        return {
+          name: `Emprestei p/ ${item.devedor || '?'}`,
+          emoji: '🏦',
+          value: item.valor,
+          meta: item.data_emprestimo ? formatDate(item.data_emprestimo) : '',
+          status: item.status,
+        }
+      case 'dividas-terceiros':
+        return {
+          name: `Devo p/ ${item.credor || '?'}`,
+          emoji: '📝',
+          value: item.valor,
+          meta: item.data_emprestimo ? formatDate(item.data_emprestimo) : '',
+          status: item.status,
+        }
+      default:
+        return { name: 'Item', emoji: '📦', value: 0, meta: '' }
+    }
+  }
+
   function renderEditForm(item) {
-    if (tipo === 'despesas' || tipo === 'combustivel') {
+    const tipo = item._tipo
+    const inputClass = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-white/20 transition-colors'
+    const labelClass = 'block text-white/60 text-xs mb-1'
+
+    if (tipo === 'despesas') {
       return (
         <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-white/60 text-xs mb-1">Categoria</label>
-              <select
-                value={editData.label || ''}
-                onChange={(e) => setEditData({ ...editData, label: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-              >
-                {CATEGORIES.map(cat => (
-                  <option key={cat.value} value={cat.value}>{cat.emoji} {cat.label}</option>
-                ))}
+              <label className={labelClass}>Categoria</label>
+              <select value={editData.label || ''} onChange={(e) => setEditData({ ...editData, label: e.target.value })} className={inputClass}>
+                {CATEGORIES.map(cat => <option key={cat.value} value={cat.value}>{cat.emoji} {cat.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-white/60 text-xs mb-1">Item</label>
-              <input
-                type="text"
-                value={editData.item || ''}
-                onChange={(e) => setEditData({ ...editData, item: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-              />
+              <label className={labelClass}>Item</label>
+              <input type="text" value={editData.item || ''} onChange={(e) => setEditData({ ...editData, item: e.target.value })} className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="block text-white/60 text-xs mb-1">Descrição</label>
-            <input
-              type="text"
-              value={editData.description || ''}
-              onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            />
+            <label className={labelClass}>Descricao</label>
+            <input type="text" value={editData.description || ''} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className={inputClass} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-white/60 text-xs mb-1">Valor Total</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editData.total_value || ''}
-                onChange={(e) => setEditData({ ...editData, total_value: parseFloat(e.target.value) })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-              />
+              <label className={labelClass}>Valor Total</label>
+              <input type="number" step="0.01" value={editData.total_value || ''} onChange={(e) => setEditData({ ...editData, total_value: parseFloat(e.target.value) })} className={inputClass} />
             </div>
             <div>
-              <label className="block text-white/60 text-xs mb-1">Parcelas</label>
-              <input
-                type="number"
-                value={editData.installment || 1}
-                onChange={(e) => setEditData({ ...editData, installment: parseInt(e.target.value) })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-              />
+              <label className={labelClass}>Parcelas</label>
+              <input type="number" value={editData.installment || 1} onChange={(e) => setEditData({ ...editData, installment: parseInt(e.target.value) })} className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="block text-white/60 text-xs mb-1">Método de Pagamento</label>
-            <select
-              value={editData.payment_method || ''}
-              onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            >
-              <option value="Debito">Débito</option>
-              <option value="Credito">Crédito</option>
-              <option value="Pix">Pix</option>
-              <option value="Dinheiro">Dinheiro</option>
+            <label className={labelClass}>Pagamento</label>
+            <select value={editData.payment_method || ''} onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })} className={inputClass}>
+              {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
         </div>
@@ -217,32 +349,16 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       return (
         <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
           <div>
-            <label className="block text-white/60 text-xs mb-1">Para quem</label>
-            <input
-              type="text"
-              value={editData.para || ''}
-              onChange={(e) => setEditData({ ...editData, para: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            />
+            <label className={labelClass}>Para quem</label>
+            <input type="text" value={editData.para || ''} onChange={(e) => setEditData({ ...editData, para: e.target.value })} className={inputClass} />
           </div>
           <div>
-            <label className="block text-white/60 text-xs mb-1">Descrição</label>
-            <input
-              type="text"
-              value={editData.description || ''}
-              onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            />
+            <label className={labelClass}>Descricao</label>
+            <input type="text" value={editData.description || ''} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className={inputClass} />
           </div>
           <div>
-            <label className="block text-white/60 text-xs mb-1">Valor</label>
-            <input
-              type="number"
-              step="0.01"
-              value={editData.valor || ''}
-              onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            />
+            <label className={labelClass}>Valor</label>
+            <input type="number" step="0.01" value={editData.valor || ''} onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })} className={inputClass} />
           </div>
         </div>
       )
@@ -252,46 +368,23 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       return (
         <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
           <div>
-            <label className="block text-white/60 text-xs mb-1">Nome</label>
-            <input
-              type="text"
-              value={editData.nome || ''}
-              onChange={(e) => setEditData({ ...editData, nome: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            />
+            <label className={labelClass}>Nome</label>
+            <input type="text" value={editData.nome || ''} onChange={(e) => setEditData({ ...editData, nome: e.target.value })} className={inputClass} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-white/60 text-xs mb-1">Valor</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editData.valor || ''}
-                onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-              />
+              <label className={labelClass}>Valor</label>
+              <input type="number" step="0.01" value={editData.valor || ''} onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })} className={inputClass} />
             </div>
             <div>
-              <label className="block text-white/60 text-xs mb-1">Dia Vencimento</label>
-              <input
-                type="number"
-                value={editData.dia_vencimento || ''}
-                onChange={(e) => setEditData({ ...editData, dia_vencimento: parseInt(e.target.value) })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-              />
+              <label className={labelClass}>Dia Vencimento</label>
+              <input type="number" value={editData.dia_vencimento || ''} onChange={(e) => setEditData({ ...editData, dia_vencimento: parseInt(e.target.value) })} className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="block text-white/60 text-xs mb-1">Método de Pagamento</label>
-            <select
-              value={editData.payment_method || ''}
-              onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            >
-              <option value="Debito">Débito</option>
-              <option value="Credito">Crédito</option>
-              <option value="Pix">Pix</option>
-              <option value="Dinheiro">Dinheiro</option>
+            <label className={labelClass}>Pagamento</label>
+            <select value={editData.payment_method || ''} onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })} className={inputClass}>
+              {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
         </div>
@@ -302,26 +395,92 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       return (
         <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
           <div>
-            <label className="block text-white/60 text-xs mb-1">Categoria</label>
-            <select
-              value={editData.categoria || ''}
-              onChange={(e) => setEditData({ ...editData, categoria: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            >
-              {CATEGORIES.map(cat => (
-                <option key={cat.value} value={cat.value}>{cat.emoji} {cat.label}</option>
-              ))}
+            <label className={labelClass}>Categoria</label>
+            <select value={editData.categoria || ''} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className={inputClass}>
+              {CATEGORIES.map(cat => <option key={cat.value} value={cat.value}>{cat.emoji} {cat.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-white/60 text-xs mb-1">Valor Limite</label>
-            <input
-              type="number"
-              step="0.01"
-              value={editData.limite || ''}
-              onChange={(e) => setEditData({ ...editData, limite: parseFloat(e.target.value) })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-            />
+            <label className={labelClass}>Valor Limite</label>
+            <input type="number" step="0.01" value={editData.limite || ''} onChange={(e) => setEditData({ ...editData, limite: parseFloat(e.target.value) })} className={inputClass} />
+          </div>
+        </div>
+      )
+    }
+
+    if (tipo === 'emprestimos-terceiros') {
+      return (
+        <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
+          <div>
+            <label className={labelClass}>Para quem emprestei</label>
+            <input type="text" value={editData.devedor || ''} onChange={(e) => setEditData({ ...editData, devedor: e.target.value })} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Descricao</label>
+            <input type="text" value={editData.descricao || ''} onChange={(e) => setEditData({ ...editData, descricao: e.target.value })} className={inputClass} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Valor</label>
+              <input type="number" step="0.01" value={editData.valor || ''} onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Status</label>
+              <select value={editData.status || 'em aberto'} onChange={(e) => setEditData({ ...editData, status: e.target.value })} className={inputClass}>
+                {STATUS_TERCEIROS.map(s => <option key={s.value} value={s.value}>{s.emoji} {s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Data Emprestimo</label>
+              <input type="date" value={editData.data_emprestimo ? new Date(editData.data_emprestimo).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_emprestimo: e.target.value })} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Data Devolucao</label>
+              <input type="date" value={editData.data_devolucao ? new Date(editData.data_devolucao).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_devolucao: e.target.value })} className={inputClass} />
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (tipo === 'dividas-terceiros') {
+      return (
+        <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
+          <div>
+            <label className={labelClass}>Devo para</label>
+            <input type="text" value={editData.credor || ''} onChange={(e) => setEditData({ ...editData, credor: e.target.value })} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Descricao</label>
+            <input type="text" value={editData.descricao || ''} onChange={(e) => setEditData({ ...editData, descricao: e.target.value })} className={inputClass} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Valor</label>
+              <input type="number" step="0.01" value={editData.valor || ''} onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Status</label>
+              <select value={editData.status || 'em aberto'} onChange={(e) => setEditData({ ...editData, status: e.target.value })} className={inputClass}>
+                {STATUS_TERCEIROS.map(s => <option key={s.value} value={s.value}>{s.emoji} {s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Data Emprestimo</label>
+              <input type="date" value={editData.data_emprestimo ? new Date(editData.data_emprestimo).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_emprestimo: e.target.value })} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Data Pagamento</label>
+              <input type="date" value={editData.data_pagamento ? new Date(editData.data_pagamento).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_pagamento: e.target.value })} className={inputClass} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <input type="checkbox" checked={editData.emprestimo_conta || false} onChange={(e) => setEditData({ ...editData, emprestimo_conta: e.target.checked })} className="w-4 h-4 rounded bg-white/5 border-white/20" />
+            <label className="text-white/60 text-xs">Emprestimo da minha conta</label>
           </div>
         </div>
       )
@@ -330,64 +489,228 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
     return null
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-32" />
-        <Skeleton className="h-48" />
-      </div>
-    )
-  }
+  const activeFilterCount = [filters.categoria, filters.pagamento, filters.status, filters.mes].filter(Boolean).length
+
+  // Categorias que realmente existem nos dados carregados
+  const categoriasPresentes = useMemo(() => {
+    const ids = new Set(allItems.map(i => i._categoria))
+    return ALL_CATEGORIAS.filter(c => ids.has(c.id))
+  }, [allItems])
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <h1 className="text-2xl font-semibold text-white">Editar Registros</h1>
-
-      {/* Botões de Tipo */}
-      <div className="flex gap-2 flex-wrap">
-        {TIPOS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTipo(t.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all
-                        ${tipo === t.id
-                          ? `bg-gradient-to-br ${colors.gradient} text-white`
-                          : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'}`}
-          >
-            {t.label}
-          </button>
-        ))}
+    <div className="space-y-4 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-white">Editar Registros</h1>
+        <div className="flex gap-1">
+          {[
+            { id: 'date', label: 'Data' },
+            { id: 'value', label: 'Valor' },
+            { id: 'name', label: 'A-Z' },
+          ].map(s => (
+            <button
+              key={s.id}
+              onClick={() => toggleSort(s.id)}
+              className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all flex items-center gap-1
+                ${sortBy === s.id ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/50'}`}
+            >
+              {s.label}
+              {sortBy === s.id && (sortDir === 'desc' ? <ArrowDown size={10} /> : <ArrowUp size={10} />)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Lista de Items */}
-      {items.length > 0 ? (
+      {/* Search Bar */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Buscar por nome, item, descricao..."
+          className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 outline-none focus:border-white/20 transition-colors"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/50">
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-1.5 flex-wrap">
+        {/* Categoria */}
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setOpenFilter(openFilter === 'categoria' ? null : 'categoria')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1
+              ${filters.categoria
+                ? `bg-gradient-to-br ${colors.gradient}/20 ${colors.text} border border-current/20`
+                : 'bg-white/5 text-white/50 border border-white/10 hover:text-white/70'}`}
+          >
+            Categoria {filters.categoria && `· ${ALL_CATEGORIAS.find(c => c.id === filters.categoria)?.label || filters.categoria}`}
+            <ChevronDown size={12} className={openFilter === 'categoria' ? 'rotate-180' : ''} />
+          </button>
+          {openFilter === 'categoria' && (
+            <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 max-h-60 overflow-y-auto min-w-[180px]">
+              <button onClick={() => { setFilters(f => ({ ...f, categoria: null })); setOpenFilter(null) }}
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
+                Todas
+              </button>
+              {categoriasPresentes.map(cat => (
+                <button key={cat.id} onClick={() => { setFilters(f => ({ ...f, categoria: cat.id })); setOpenFilter(null) }}
+                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
+                    ${filters.categoria === cat.id ? 'text-white bg-white/5' : 'text-white/70'}`}>
+                  {cat.emoji} {cat.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pagamento */}
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setOpenFilter(openFilter === 'pagamento' ? null : 'pagamento')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1
+              ${filters.pagamento
+                ? `bg-gradient-to-br ${colors.gradient}/20 ${colors.text} border border-current/20`
+                : 'bg-white/5 text-white/50 border border-white/10 hover:text-white/70'}`}
+          >
+            Pagamento {filters.pagamento && `· ${filters.pagamento}`}
+            <ChevronDown size={12} className={openFilter === 'pagamento' ? 'rotate-180' : ''} />
+          </button>
+          {openFilter === 'pagamento' && (
+            <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 min-w-[120px]">
+              <button onClick={() => { setFilters(f => ({ ...f, pagamento: null })); setOpenFilter(null) }}
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
+                Todos
+              </button>
+              {PAYMENT_METHODS.map(m => (
+                <button key={m} onClick={() => { setFilters(f => ({ ...f, pagamento: m })); setOpenFilter(null) }}
+                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
+                    ${filters.pagamento === m ? 'text-white bg-white/5' : 'text-white/70'}`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Status */}
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setOpenFilter(openFilter === 'status' ? null : 'status')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1
+              ${filters.status
+                ? `bg-gradient-to-br ${colors.gradient}/20 ${colors.text} border border-current/20`
+                : 'bg-white/5 text-white/50 border border-white/10 hover:text-white/70'}`}
+          >
+            Status {filters.status && `· ${filters.status}`}
+            <ChevronDown size={12} className={openFilter === 'status' ? 'rotate-180' : ''} />
+          </button>
+          {openFilter === 'status' && (
+            <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 min-w-[130px]">
+              <button onClick={() => { setFilters(f => ({ ...f, status: null })); setOpenFilter(null) }}
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
+                Todos
+              </button>
+              {STATUS_TERCEIROS.map(s => (
+                <button key={s.value} onClick={() => { setFilters(f => ({ ...f, status: s.value })); setOpenFilter(null) }}
+                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
+                    ${filters.status === s.value ? 'text-white bg-white/5' : 'text-white/70'}`}>
+                  {s.emoji} {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Mes */}
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setOpenFilter(openFilter === 'mes' ? null : 'mes')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1
+              ${filters.mes
+                ? `bg-gradient-to-br ${colors.gradient}/20 ${colors.text} border border-current/20`
+                : 'bg-white/5 text-white/50 border border-white/10 hover:text-white/70'}`}
+          >
+            Mes {filters.mes && `· ${getMonthOptions().find(m => m.value === filters.mes)?.label || filters.mes}`}
+            <ChevronDown size={12} className={openFilter === 'mes' ? 'rotate-180' : ''} />
+          </button>
+          {openFilter === 'mes' && (
+            <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 min-w-[130px]">
+              <button onClick={() => { setFilters(f => ({ ...f, mes: null })); setOpenFilter(null) }}
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
+                Todos
+              </button>
+              {getMonthOptions().map(m => (
+                <button key={m.value} onClick={() => { setFilters(f => ({ ...f, mes: m.value })); setOpenFilter(null) }}
+                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
+                    ${filters.mes === m.value ? 'text-white bg-white/5' : 'text-white/70'}`}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {activeFilterCount > 0 && (
+          <button
+            onClick={() => setFilters({ categoria: null, pagamento: null, status: null, mes: null })}
+            className="px-2 py-1.5 rounded-xl text-xs text-white/30 hover:text-white/50 transition-colors"
+          >
+            Limpar filtros
+          </button>
+        )}
+      </div>
+
+      {/* Results count */}
+      <p className="text-xs text-white/30">
+        {loading ? '...' : (
+          <>
+            {displayedItems.length} registro{displayedItems.length !== 1 ? 's' : ''}
+            {searchQuery && ` para "${searchQuery}"`}
+            {activeFilterCount > 0 && ` (${activeFilterCount} filtro${activeFilterCount > 1 ? 's' : ''} ativo${activeFilterCount > 1 ? 's' : ''})`}
+          </>
+        )}
+      </p>
+
+      {/* Record List */}
+      {loading ? (
         <div className="space-y-2">
-          {items.map((item) => {
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
+      ) : displayedItems.length > 0 ? (
+        <div className="space-y-2">
+          {displayedItems.map((item) => {
             const isExpanded = expandedId === item._id
+            const display = getItemDisplay(item)
             return (
-              <div
-                key={item._id}
-                className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden"
-              >
+              <div key={`${item._tipo}-${item._id}`} className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden">
                 <button
                   onClick={() => handleExpand(item)}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors"
                 >
-                  <div className="flex-1 text-left">
-                    <p className="text-white text-sm font-medium">
-                      {item.nome || item.item || item.para || getCategoryDisplay(item.categoria) || 'Item'}
-                    </p>
-                    <p className="text-white/40 text-xs">
-                      {item.createdAt && formatDateFull(item.createdAt)}
-                      {item.total_value && ` • ${fmt(item.total_value)}`}
-                      {item.valor && ` • ${fmt(item.valor)}`}
-                      {item.limite && ` • Limite: ${fmt(item.limite)}`}
-                    </p>
+                  <span className="text-lg flex-shrink-0">{display.emoji}</span>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{display.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-white/40 text-xs truncate">{display.meta}</p>
+                      {display.status && (
+                        <Badge color={display.status === 'em aberto' ? 'coral' : 'mint'}>
+                          {display.status === 'em aberto' ? '🟡 Aberto' : '🟢 Quitado'}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <ChevronDown
-                    size={16}
-                    className={`text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                  />
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-white font-semibold text-sm">{fmt(display.value)}</span>
+                    <ChevronDown size={14} className={`text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </div>
                 </button>
 
                 {isExpanded && (
@@ -395,7 +718,7 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
                     {renderEditForm(item)}
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleSave(item._id)}
+                        onClick={() => handleSave(item)}
                         disabled={saving}
                         className={`flex-1 bg-gradient-to-br ${colors.gradient} text-white rounded-xl py-2.5 px-4
                                     flex items-center justify-center gap-2 font-medium
@@ -405,9 +728,8 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
                         {saving ? 'Salvando...' : 'Salvar'}
                       </button>
                       <button
-                        onClick={() => handleDelete(item._id)}
-                        className="px-4 py-2.5 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30
-                                   transition-colors flex items-center gap-2"
+                        onClick={() => handleDelete(item)}
+                        className="px-4 py-2.5 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors flex items-center gap-2"
                       >
                         <Trash2 size={16} />
                         Excluir
@@ -420,16 +742,18 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           })}
         </div>
       ) : (
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-12 text-center">
-          <p className="text-white/40 text-sm">Nenhum registro encontrado</p>
-        </div>
+        <EmptyState
+          icon="🔍"
+          message="Nenhum registro encontrado"
+          sub={searchQuery ? 'Tente outro termo de busca' : activeFilterCount > 0 ? 'Tente remover alguns filtros' : null}
+        />
       )}
 
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 animate-slide-up z-50
                          ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white`}>
-          {toast.type === 'success' ? <Check size={20} /> : <AlertCircle size={20} />}
+          {toast.type === 'success' ? <Check size={20} /> : <CircleAlert size={20} />}
           <span className="font-medium">{toast.message}</span>
         </div>
       )}

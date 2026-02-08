@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ListItem, SectionTitle, EmptyState, Skeleton } from '@/components/ui/Cards'
-import { fmt, formatDateFull, getCategoryDisplay } from '@/lib/helpers'
-import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar } from 'lucide-react'
+import { fmt, formatDateFull, getCategoryEmoji } from '@/lib/helpers'
+import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar, User } from 'lucide-react'
 
-export default function AcertoPage({ user, outro, colors, refreshKey, triggerRefresh }) {
+export default function AcertoPage({ user, outro, colors, refreshKey, triggerRefresh, focusSection, clearFocus }) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState({
     despesas: [],
@@ -23,9 +23,28 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
   const [quitandoItem, setQuitandoItem] = useState(null) // { id, tipo, valor, nome }
   const [dataQuitacao, setDataQuitacao] = useState(new Date().toISOString().split('T')[0])
 
+  const pendentesRef = useRef(null)
+  const emprestimosRef = useRef(null)
+  const dividasRef = useRef(null)
+
   useEffect(() => {
     loadData()
   }, [user, refreshKey])
+
+  useEffect(() => {
+    if (!focusSection || loading) return
+    setTimeout(() => {
+      if (focusSection === 'pendentes') {
+        setExpandItens(true)
+        pendentesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else if (focusSection === 'emprestimos') {
+        emprestimosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else if (focusSection === 'dividas') {
+        dividasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      if (clearFocus) clearFocus()
+    }, 300)
+  }, [focusSection, loading])
 
   async function loadData() {
     setLoading(true)
@@ -42,7 +61,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
       setDividasTerceiros(divT.filter(d => d.status === 'em aberto'))
       setContasFixas(cf.filter(c => c.buyer === user && c.payment_method !== 'Credito'))
 
-      calcularSaldo(acerto.despesas, acerto.emprestimos, acerto.quitacoes)
+      calcularSaldo(acerto.despesas, acerto.emprestimos)
     } catch (error) {
       console.error('Erro ao carregar acerto:', error)
     } finally {
@@ -50,7 +69,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
     }
   }
 
-  function calcularSaldo(despesas, emprestimos, quitacoes) {
+  function calcularSaldo(despesas, emprestimos) {
     let userDeve = 0
     let outroDeve = 0
 
@@ -69,15 +88,6 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
         outroDeve += e.valor // Eu emprestei
       } else if (e.de === outro) {
         userDeve += e.valor // Eu peguei emprestado
-      }
-    })
-
-    // Quitações pendentes
-    quitacoes.forEach(q => {
-      if (q.devedor === user) {
-        userDeve += q.valor
-      } else if (q.devedor === outro) {
-        outroDeve += q.valor
       }
     })
 
@@ -167,7 +177,6 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
       const itensQuitados = [
         ...data.despesas.map(d => ({ tipo: 'despesa', id: d._id, descricao: d.label })),
         ...data.emprestimos.map(e => ({ tipo: 'emprestimo', id: e._id, descricao: 'Empréstimo' })),
-        ...data.quitacoes.map(q => ({ tipo: 'quitacao', id: q._id, descricao: q.descricao })),
       ]
 
       const res = await fetch('/api/acerto', {
@@ -206,7 +215,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
     )
   }
 
-  const temPendenciasEntreVoces = data.despesas.length > 0 || data.emprestimos.length > 0 || data.quitacoes.length > 0
+  const temPendenciasEntreVoces = data.despesas.length > 0 || data.emprestimos.length > 0
   const temPendenciasTerceiros = emprestimosTerceiros.length > 0 || dividasTerceiros.length > 0
 
   return (
@@ -279,7 +288,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
 
       {/* ========== SEÇÃO 1: ENTRE VOCÊS DOIS ========== */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-white/40 text-sm">
+        <div ref={pendentesRef} className="flex items-center gap-2 text-white/40 text-sm">
           <Users size={18} />
           <span className="font-medium">Entre vocês dois</span>
         </div>
@@ -349,7 +358,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
               <div className="flex items-center gap-2">
                 <Receipt size={18} className="text-white/40" />
                 <span className="text-white font-medium text-sm">
-                  Itens Pendentes ({data.despesas.length + data.emprestimos.length + data.quitacoes.length})
+                  Itens Pendentes ({data.despesas.length + data.emprestimos.length})
                 </span>
               </div>
               <ChevronDown size={18} className={`text-white/40 transition-transform ${expandItens ? 'rotate-180' : ''}`} />
@@ -357,63 +366,42 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
             {expandItens && (
               <div className="px-5 pb-4 space-y-2 border-t border-white/5 pt-4">
                 {data.despesas.map((d) => (
-                  <ListItem
-                    key={d._id}
-                    borderColor={d.devedor === user ? '#fca5a5' : '#6ee7b7'}
-                  >
+                  <div key={d._id} className={`bg-base-800/40 border rounded-2xl p-4 ${d.devedor === user ? 'border-coral-400/10' : 'border-mint-400/10'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">
-                          {getCategoryDisplay(d.label)} - {d.item}
+                        <p className="text-white text-sm font-medium flex items-center gap-1.5">
+                          <span>{getCategoryEmoji(d.label)}</span>
+                          {d.item}
                         </p>
-                        <p className="text-white/40 text-xs truncate">{d.description || 'Sem descrição'}</p>
+                        <p className="text-white/40 text-xs truncate mt-1">{d.description || 'Sem descricao'}</p>
                         <p className="text-white/60 text-xs mt-1">
-                          {d.devedor === user ? 'Você deve' : `${outro} deve`}
+                          {d.devedor === user ? 'Voce deve' : `${outro} deve`}
                         </p>
                       </div>
-                      <p className={`text-sm font-semibold ${d.devedor === user ? 'text-coral-400' : 'text-mint-400'}`}>
+                      <p className={`text-lg font-bold ${d.devedor === user ? 'text-coral-400' : 'text-mint-400'}`}>
                         {fmt(d.valor_pendente)}
                       </p>
                     </div>
-                  </ListItem>
+                  </div>
                 ))}
                 {data.emprestimos.map((e) => (
-                  <ListItem
-                    key={e._id}
-                    borderColor={e.de === user ? '#6ee7b7' : '#fca5a5'}
-                  >
+                  <div key={e._id} className={`bg-base-800/40 border rounded-2xl p-4 ${e.de === user ? 'border-mint-400/10' : 'border-coral-400/10'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium">🤝 Empréstimo</p>
-                        <p className="text-white/40 text-xs">{e.descricao || 'Sem descrição'}</p>
+                        <p className="text-white text-sm font-medium flex items-center gap-1.5">
+                          <span>🤝</span>
+                          Empréstimo
+                        </p>
+                        <p className="text-white/40 text-xs truncate mt-1">{e.descricao || 'Sem descricao'}</p>
                         <p className="text-white/60 text-xs mt-1">
-                          {e.de === user ? `${outro} deve` : 'Você deve'}
+                          {e.de === user ? `${outro} deve` : 'Voce deve'}
                         </p>
                       </div>
-                      <p className={`text-sm font-semibold ${e.de === user ? 'text-mint-400' : 'text-coral-400'}`}>
+                      <p className={`text-lg font-bold ${e.de === user ? 'text-mint-400' : 'text-coral-400'}`}>
                         {fmt(e.valor)}
                       </p>
                     </div>
-                  </ListItem>
-                ))}
-                {data.quitacoes.map((q) => (
-                  <ListItem
-                    key={q._id}
-                    borderColor={q.devedor === user ? '#fca5a5' : '#6ee7b7'}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{q.descricao}</p>
-                        <p className="text-white/40 text-xs truncate">{q.observacao || 'Sem observação'}</p>
-                        <p className="text-white/60 text-xs mt-1">
-                          {q.devedor === user ? 'Você deve' : `${outro} deve`}
-                        </p>
-                      </div>
-                      <p className={`text-sm font-semibold ${q.devedor === user ? 'text-coral-400' : 'text-mint-400'}`}>
-                        {fmt(q.valor)}
-                      </p>
-                    </div>
-                  </ListItem>
+                  </div>
                 ))}
               </div>
             )}
@@ -431,13 +419,13 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
 
           {/* Empréstimos a Terceiros */}
           {emprestimosTerceiros.length > 0 && (
-            <div className="bg-gradient-to-br from-lavender-500/10 to-lavender-600/5 backdrop-blur-sm border border-lavender-400/20 rounded-3xl p-5">
+            <div ref={emprestimosRef} className="bg-gradient-to-br from-lavender-500/10 to-lavender-600/5 backdrop-blur-sm border border-lavender-400/20 rounded-3xl p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-lavender-500/20 border border-lavender-400/30 flex items-center justify-center">
                   <Wallet size={18} className="text-lavender-400" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold text-sm">Emprestei para</h3>
+                  <h3 className="text-white font-semibold text-sm">Empréstimos</h3>
                   <p className="text-white/40 text-xs">{emprestimosTerceiros.length} pessoa(s)</p>
                 </div>
               </div>
@@ -446,7 +434,10 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                   <div key={e._id} className="bg-base-800/40 border border-lavender-400/10 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium">Para: {e.devedor}</p>
+                        <p className="text-white text-sm font-medium flex items-center gap-1.5">
+                          <User size={14} className="text-white/40" />
+                          {e.devedor}
+                        </p>
                         <p className="text-white/40 text-xs truncate mt-1">{e.descricao}</p>
                         <p className="text-white/60 text-xs mt-1">
                           Devolução: {formatDateFull(e.data_devolucao)}
@@ -469,13 +460,13 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
 
           {/* Dívidas a Terceiros */}
           {dividasTerceiros.length > 0 && (
-            <div className="bg-gradient-to-br from-peach-500/10 to-peach-600/5 backdrop-blur-sm border border-peach-400/20 rounded-3xl p-5">
+            <div ref={dividasRef} className="bg-gradient-to-br from-peach-500/10 to-peach-600/5 backdrop-blur-sm border border-peach-400/20 rounded-3xl p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-peach-500/20 border border-peach-400/30 flex items-center justify-center">
                   <Receipt size={18} className="text-peach-400" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold text-sm">Devo para</h3>
+                  <h3 className="text-white font-semibold text-sm">Dívidas</h3>
                   <p className="text-white/40 text-xs">{dividasTerceiros.length} pessoa(s)</p>
                 </div>
               </div>
@@ -484,7 +475,10 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                   <div key={d._id} className="bg-base-800/40 border border-peach-400/10 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium">Para: {d.credor}</p>
+                        <p className="text-white text-sm font-medium flex items-center gap-1.5">
+                          <User size={14} className="text-white/40" />
+                          {d.credor}
+                        </p>
                         <p className="text-white/40 text-xs truncate mt-1">{d.descricao}</p>
                         <p className="text-white/60 text-xs mt-1">
                           Pagamento: {formatDateFull(d.data_pagamento)}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ProgressBar, SectionTitle, Skeleton, Badge } from '@/components/ui/Cards'
 import { fmt, getCategoryDisplay, calcPeriodoFatura, CATEGORIES } from '@/lib/helpers'
-import { ChevronDown, Plus, Target, AlertTriangle, Check } from 'lucide-react'
+import { ChevronDown, Plus, Target, TriangleAlert, Check } from 'lucide-react'
 
 export default function MetasPage({ user, outro, colors, refreshKey, triggerRefresh }) {
   const [loading, setLoading] = useState(true)
@@ -102,10 +102,10 @@ export default function MetasPage({ user, outro, colors, refreshKey, triggerRefr
 
   function getStatusBadge(percentual) {
     if (percentual >= 100) {
-      return <Badge color="red" icon={<AlertTriangle size={12} />}>Excedido</Badge>
+      return <Badge color="red" icon={<TriangleAlert size={12} />}>Excedido</Badge>
     }
     if (percentual >= 80) {
-      return <Badge color="yellow" icon={<AlertTriangle size={12} />}>Atenção</Badge>
+      return <Badge color="yellow" icon={<TriangleAlert size={12} />}>Atenção</Badge>
     }
     return <Badge color="green" icon={<Check size={12} />}>No limite</Badge>
   }

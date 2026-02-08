@@ -9,8 +9,8 @@ const TIPOS = [
   { id: 'moto', label: 'Moto', icon: Bike, emoji: '🏍️' },
   { id: 'carro', label: 'Carro', icon: Car, emoji: '🚗' },
   { id: 'gasto', label: 'Gasto', icon: Plus, emoji: '💰' },
-  { id: 'emprestei', label: 'Emprestei', icon: Handshake, emoji: '🤝' },
-  { id: 'devo', label: 'Devo', icon: CreditCard, emoji: '💳' },
+  { id: 'emprestei', label: 'Empréstimos', icon: Handshake, emoji: '🤝' },
+  { id: 'devo', label: 'Dívidas', icon: CreditCard, emoji: '💳' },
   { id: 'conta-fixa', label: 'Conta Fixa', icon: Receipt, emoji: '📄' },
 ]
 
@@ -27,7 +27,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
   const [dataMoto, setDataMoto] = useState(new Date().toISOString().split('T')[0])
 
   // Form Abastecimento Carro
-  const [valorCarro, setValorCarro] = useState('100.00')
+  const [valorCarro, setValorCarro] = useState('60.00')
   const [pagamentoCarro, setPagamentoCarro] = useState('Debito')
   const [dataCarro, setDataCarro] = useState(new Date().toISOString().split('T')[0])
 
