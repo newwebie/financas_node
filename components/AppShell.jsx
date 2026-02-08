@@ -88,7 +88,7 @@ export default function AppShell({ user, onSwitchUser }) {
     switch (activePage) {
       case 'home': return <HomePage {...props} openEditItem={openEditItem} openAcerto={openAcerto} />
       case 'novo': return <NovoPage {...props} />
-      case 'acerto': return <AcertoPage {...props} focusSection={acertoFocus} clearFocus={() => setAcertoFocus(null)} />
+      case 'acerto': return <AcertoPage {...props} focusSection={acertoFocus} clearFocus={() => setAcertoFocus(null)} openEditItem={openEditItem} />
       case 'relatorio': return <RelatorioPage {...props} />
       case 'combustivel': return <CombustivelPage {...props} />
       case 'metas': return <MetasPage {...props} />

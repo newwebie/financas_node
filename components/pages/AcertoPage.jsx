@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { ListItem, SectionTitle, EmptyState, Skeleton } from '@/components/ui/Cards'
 import { fmt, formatDateFull, getCategoryEmoji } from '@/lib/helpers'
-import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar, User } from 'lucide-react'
+import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar, User, Pencil, Trash2 } from 'lucide-react'
 
-export default function AcertoPage({ user, outro, colors, refreshKey, triggerRefresh, focusSection, clearFocus }) {
+export default function AcertoPage({ user, outro, colors, refreshKey, triggerRefresh, focusSection, clearFocus, openEditItem }) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState({
     despesas: [],
@@ -154,6 +154,22 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
       }
     } catch (error) {
       showFeedback('Erro ao quitar', true)
+    }
+  }
+
+  async function handleExcluirTerceiro(id, endpoint, nome) {
+    if (!confirm(`Excluir "${nome}"?`)) return
+    try {
+      const res = await fetch(`${endpoint}?id=${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        showFeedback('Excluído!')
+        loadData()
+        triggerRefresh()
+      } else {
+        showFeedback('Erro ao excluir', true)
+      }
+    } catch {
+      showFeedback('Erro ao excluir', true)
     }
   }
 
@@ -434,24 +450,38 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                   <div key={e._id} className="bg-base-800/40 border border-lavender-400/10 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium flex items-center gap-1.5">
-                          <User size={14} className="text-white/40" />
+                        <p className="text-white text-base font-semibold flex items-center gap-1.5">
+                          <User size={16} className="text-white/40" />
                           {e.devedor}
                         </p>
-                        <p className="text-white/40 text-xs truncate mt-1">{e.descricao}</p>
+                        <p className="text-white/40 text-sm truncate mt-1">{e.descricao}</p>
                         <p className="text-white/60 text-xs mt-1">
                           Devolução: {formatDateFull(e.data_devolucao)}
                         </p>
                       </div>
                       <p className="text-lavender-400 text-lg font-bold">{fmt(e.valor)}</p>
                     </div>
-                    <button
-                      onClick={() => abrirModalQuitacao(e._id, 'emprestimo', e.valor, `Empréstimo para ${e.devedor}`)}
-                      className="w-full py-2.5 rounded-xl bg-mint-500/20 border border-mint-400/30 text-mint-400 text-sm font-medium hover:bg-mint-500/30 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Check size={16} />
-                      Marcar como Pago
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => abrirModalQuitacao(e._id, 'emprestimo', e.valor, `Empréstimo para ${e.devedor}`)}
+                        className="flex-[8] py-2 rounded-xl bg-mint-500/20 border border-mint-400/30 text-mint-400 text-xs font-medium hover:bg-mint-500/30 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Check size={14} />
+                        Marcar como Pago
+                      </button>
+                      <button
+                        onClick={() => openEditItem && openEditItem(e._id)}
+                        className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleExcluirTerceiro(e._id, '/api/emprestimos-terceiros', e.descricao || `Empréstimo para ${e.devedor}`)}
+                        className="flex-1 py-2 rounded-xl bg-coral-500/10 border border-coral-400/20 text-coral-400/60 hover:bg-coral-500/20 hover:text-coral-400 transition-all flex items-center justify-center"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -475,11 +505,11 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                   <div key={d._id} className="bg-base-800/40 border border-peach-400/10 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium flex items-center gap-1.5">
-                          <User size={14} className="text-white/40" />
+                        <p className="text-white text-base font-semibold flex items-center gap-1.5">
+                          <User size={16} className="text-white/40" />
                           {d.credor}
                         </p>
-                        <p className="text-white/40 text-xs truncate mt-1">{d.descricao}</p>
+                        <p className="text-white/40 text-sm truncate mt-1">{d.descricao}</p>
                         <p className="text-white/60 text-xs mt-1">
                           Pagamento: {formatDateFull(d.data_pagamento)}
                           {d.emprestimo_conta && ' • Empréstimo da conta'}
@@ -487,13 +517,27 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                       </div>
                       <p className="text-peach-400 text-lg font-bold">{fmt(d.valor)}</p>
                     </div>
-                    <button
-                      onClick={() => abrirModalQuitacao(d._id, 'divida', d.valor, `Dívida para ${d.credor}`)}
-                      className="w-full py-2.5 rounded-xl bg-mint-500/20 border border-mint-400/30 text-mint-400 text-sm font-medium hover:bg-mint-500/30 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Check size={16} />
-                      Marcar como Pago
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => abrirModalQuitacao(d._id, 'divida', d.valor, `Dívida para ${d.credor}`)}
+                        className="flex-[8] py-2 rounded-xl bg-mint-500/20 border border-mint-400/30 text-mint-400 text-xs font-medium hover:bg-mint-500/30 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Check size={14} />
+                        Marcar como Pago
+                      </button>
+                      <button
+                        onClick={() => openEditItem && openEditItem(d._id)}
+                        className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleExcluirTerceiro(d._id, '/api/dividas-terceiros', d.descricao || `Dívida para ${d.credor}`)}
+                        className="flex-1 py-2 rounded-xl bg-coral-500/10 border border-coral-400/20 text-coral-400/60 hover:bg-coral-500/20 hover:text-coral-400 transition-all flex items-center justify-center"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -538,7 +582,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-white/40 text-sm pt-4">
             <History size={18} />
-            <span className="font-medium">Histórico</span>
+            <span className="font-medium">Últimos Acertos</span>
           </div>
 
           <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden">

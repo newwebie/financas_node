@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react'
 import { StatCard, ListItem, SectionTitle, Skeleton } from '@/components/ui/Cards'
 import { fmt, formatDateFull, getUserColors } from '@/lib/helpers'
-import { Fuel } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { Fuel, ChevronDown } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts'
 
 export default function CombustivelPage({ user, outro, colors, refreshKey, triggerRefresh }) {
   const [loading, setLoading] = useState(true)
   const [combustiveis, setCombustiveis] = useState({ moto: [], carro: [] })
   const [stats, setStats] = useState({})
   const [chartData, setChartData] = useState({ moto: [], carro: [] })
+  const [showUltimos, setShowUltimos] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -122,14 +123,15 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
     return null
   }
 
-  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-    if (percent < 0.05) return null // Não mostrar label se menor que 5%
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-    const x = cx + radius * Math.cos(-midAngle * Math.PI / 180)
-    const y = cy + radius * Math.sin(-midAngle * Math.PI / 180)
+  const renderCustomLabel = ({ cx, cy, midAngle, outerRadius, percent }) => {
+    if (percent < 0.05) return null
+    const RADIAN = Math.PI / 180
+    const radius = outerRadius + 20
+    const x = cx + radius * Math.cos(-midAngle * RADIAN)
+    const y = cy + radius * Math.sin(-midAngle * RADIAN)
 
     return (
-      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-sm font-semibold">
+      <text x={x} y={y} fill="rgba(255,255,255,0.7)" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs font-semibold">
         {`${(percent * 100).toFixed(0)}%`}
       </text>
     )
@@ -158,65 +160,67 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
       <p className="text-white/40 text-sm">Controle de abastecimentos</p>
 
       {/* Cards de Último Abastecimento */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4">
         {/* Moto */}
         {ultimoMoto ? (
-          <div className={`bg-gradient-to-br ${ultimoMoto.buyer === 'Susanna' ? coresSu.gradient : coresPi.gradient} bg-opacity-20 border border-white/10 rounded-3xl p-5`}>
-            <div className="flex items-center gap-2 mb-3">
-              <Fuel size={20} className="text-white/60" />
-              <p className="text-white/60 text-sm font-medium">Último - Moto</p>
+          <div className={`bg-gradient-to-br ${ultimoMoto.buyer === 'Susanna' ? coresSu.gradient : coresPi.gradient} bg-opacity-20 border border-white/10 rounded-2xl md:rounded-3xl p-3 md:p-5`}>
+            <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
+              <Fuel size={14} className="text-white/60 md:hidden" />
+              <Fuel size={20} className="text-white/60 hidden md:block" />
+              <p className="text-white/60 text-[10px] md:text-sm font-medium">Último - Moto</p>
             </div>
-            <p className="text-white text-xs mb-1">{ultimoMoto.buyer}</p>
-            <h3 className="text-3xl font-bold text-white mb-2">{fmt(ultimoMoto.total_value)}</h3>
-            <p className="text-white/40 text-xs">{formatDateFull(ultimoMoto.createdAt)}</p>
+            <p className="text-white text-[10px] md:text-xs mb-0.5 md:mb-1">{ultimoMoto.buyer}</p>
+            <h3 className="text-xl md:text-3xl font-bold text-white mb-1 md:mb-2">{fmt(ultimoMoto.total_value)}</h3>
+            <p className="text-white/40 text-[10px] md:text-xs">{formatDateFull(ultimoMoto.createdAt)}</p>
             {ultimoMoto.description && (
-              <p className="text-white/50 text-xs mt-2 truncate">{ultimoMoto.description}</p>
+              <p className="text-white/50 text-[10px] md:text-xs mt-1 md:mt-2 truncate">{ultimoMoto.description}</p>
             )}
           </div>
         ) : (
-          <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5 flex items-center justify-center">
-            <p className="text-white/30 text-sm">Nenhum abastecimento de moto</p>
+          <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl md:rounded-3xl p-3 md:p-5 flex items-center justify-center">
+            <p className="text-white/30 text-[10px] md:text-sm">Nenhum de moto</p>
           </div>
         )}
 
         {/* Carro */}
         {ultimoCarro ? (
-          <div className={`bg-gradient-to-br ${ultimoCarro.buyer === 'Susanna' ? coresSu.gradient : coresPi.gradient} bg-opacity-20 border border-white/10 rounded-3xl p-5`}>
-            <div className="flex items-center gap-2 mb-3">
-              <Fuel size={20} className="text-white/60" />
-              <p className="text-white/60 text-sm font-medium">Último - Carro</p>
+          <div className={`bg-gradient-to-br ${ultimoCarro.buyer === 'Susanna' ? coresSu.gradient : coresPi.gradient} bg-opacity-20 border border-white/10 rounded-2xl md:rounded-3xl p-3 md:p-5`}>
+            <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
+              <Fuel size={14} className="text-white/60 md:hidden" />
+              <Fuel size={20} className="text-white/60 hidden md:block" />
+              <p className="text-white/60 text-[10px] md:text-sm font-medium">Último - Carro</p>
             </div>
-            <p className="text-white text-xs mb-1">{ultimoCarro.buyer}</p>
-            <h3 className="text-3xl font-bold text-white mb-2">{fmt(ultimoCarro.total_value)}</h3>
-            <p className="text-white/40 text-xs">{formatDateFull(ultimoCarro.createdAt)}</p>
+            <p className="text-white text-[10px] md:text-xs mb-0.5 md:mb-1">{ultimoCarro.buyer}</p>
+            <h3 className="text-xl md:text-3xl font-bold text-white mb-1 md:mb-2">{fmt(ultimoCarro.total_value)}</h3>
+            <p className="text-white/40 text-[10px] md:text-xs">{formatDateFull(ultimoCarro.createdAt)}</p>
             {ultimoCarro.description && (
-              <p className="text-white/50 text-xs mt-2 truncate">{ultimoCarro.description}</p>
+              <p className="text-white/50 text-[10px] md:text-xs mt-1 md:mt-2 truncate">{ultimoCarro.description}</p>
             )}
           </div>
         ) : (
-          <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5 flex items-center justify-center">
-            <p className="text-white/30 text-sm">Nenhum abastecimento de carro</p>
+          <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl md:rounded-3xl p-3 md:p-5 flex items-center justify-center">
+            <p className="text-white/30 text-[10px] md:text-sm">Nenhum de carro</p>
           </div>
         )}
       </div>
 
       {/* Gráficos de Rosca - Abastecimentos do Mês */}
       {(chartData.moto.length > 0 || chartData.carro.length > 0) && (
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl md:rounded-3xl p-3 md:p-5">
           <SectionTitle>Abastecimentos em {mesAtual}</SectionTitle>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          <div className="grid grid-cols-2 gap-2 md:gap-6 mt-3 md:mt-4">
             {/* Gráfico Moto */}
             <div>
-              <h3 className="text-white/60 text-sm font-medium mb-4 text-center">🏍️ Moto</h3>
+              <h3 className="text-white/60 text-[10px] md:text-sm font-medium mb-2 md:mb-4 text-center">🏍️ Moto</h3>
               {chartData.moto.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer width="100%" height={140} className="md:!h-[200px]">
                   <PieChart>
                     <Pie
                       data={chartData.moto}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      innerRadius="35%"
+                      outerRadius="55%"
                       paddingAngle={5}
                       dataKey="value"
                       label={renderCustomLabel}
@@ -230,16 +234,16 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[200px] flex items-center justify-center">
-                  <p className="text-white/30 text-sm">Nenhum abastecimento este mês</p>
+                <div className="h-[140px] md:h-[200px] flex items-center justify-center">
+                  <p className="text-white/30 text-[10px] md:text-sm">Nenhum este mês</p>
                 </div>
               )}
               {chartData.moto.length > 0 && (
-                <div className="flex justify-center gap-4 mt-2">
+                <div className="flex flex-col items-center gap-1 mt-1 md:mt-2">
                   {chartData.moto.map((item) => (
-                    <div key={item.name} className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-white/60 text-xs">{item.name}: {item.value}x</span>
+                    <div key={item.name} className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-white/60 text-[10px] md:text-xs">{item.name}: {item.value}x</span>
                     </div>
                   ))}
                 </div>
@@ -248,16 +252,16 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
 
             {/* Gráfico Carro */}
             <div>
-              <h3 className="text-white/60 text-sm font-medium mb-4 text-center">🚗 Carro</h3>
+              <h3 className="text-white/60 text-[10px] md:text-sm font-medium mb-2 md:mb-4 text-center">🚗 Carro</h3>
               {chartData.carro.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer width="100%" height={140} className="md:!h-[200px]">
                   <PieChart>
                     <Pie
                       data={chartData.carro}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      innerRadius="35%"
+                      outerRadius="55%"
                       paddingAngle={5}
                       dataKey="value"
                       label={renderCustomLabel}
@@ -271,16 +275,16 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[200px] flex items-center justify-center">
-                  <p className="text-white/30 text-sm">Nenhum abastecimento este mês</p>
+                <div className="h-[140px] md:h-[200px] flex items-center justify-center">
+                  <p className="text-white/30 text-[10px] md:text-sm">Nenhum este mês</p>
                 </div>
               )}
               {chartData.carro.length > 0 && (
-                <div className="flex justify-center gap-4 mt-2">
+                <div className="flex flex-col items-center gap-1 mt-1 md:mt-2">
                   {chartData.carro.map((item) => (
-                    <div key={item.name} className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-white/60 text-xs">{item.name}: {item.value}x</span>
+                    <div key={item.name} className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-white/60 text-[10px] md:text-xs">{item.name}: {item.value}x</span>
                     </div>
                   ))}
                 </div>
@@ -346,57 +350,125 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
             <span className="text-white font-bold text-lg">{fmt(stats.totalGastos || 0)}</span>
           </div>
         </div>
+
+        {/* Gráfico de Gastos por Pessoa */}
+        {(stats.gastosSusanna > 0 || stats.gastosPietrah > 0) && (() => {
+          const dadosGasto = [
+            { name: 'Susanna', valor: stats.gastosSusanna || 0, fill: coresSu.hex },
+            { name: 'Pietrah', valor: stats.gastosPietrah || 0, fill: coresPi.hex },
+          ]
+          const diff = (stats.gastosSusanna || 0) - (stats.gastosPietrah || 0)
+          const quemGastouMais = diff > 0 ? 'Susanna' : diff < 0 ? 'Pietrah' : null
+
+          return (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-white/60 text-sm font-medium mb-3">Gastos por Pessoa</p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={dadosGasto} layout="vertical" barCategoryGap="30%">
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={65} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    formatter={(value) => [fmt(value), 'Gasto']}
+                    labelStyle={{ color: 'white' }}
+                  />
+                  <Bar dataKey="valor" radius={[0, 8, 8, 0]}>
+                    {dadosGasto.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} fillOpacity={0.7} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+
+              {/* Diferença */}
+              <div className={`mt-3 p-3 rounded-xl border ${
+                diff === 0
+                  ? 'bg-white/5 border-white/10'
+                  : diff > 0
+                    ? `bg-su-400/10 border-su-400/20`
+                    : `bg-pi-400/10 border-pi-400/20`
+              }`}>
+                {diff === 0 ? (
+                  <p className="text-white/60 text-xs text-center">Gastos iguais!</p>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <p className="text-white/60 text-xs">
+                      <span className={quemGastouMais === 'Susanna' ? 'text-su-400' : 'text-pi-400'} style={{ fontWeight: 600 }}>
+                        {quemGastouMais}
+                      </span>
+                      {' '}gastou mais
+                    </p>
+                    <p className={`text-sm font-bold ${quemGastouMais === 'Susanna' ? 'text-su-400' : 'text-pi-400'}`}>
+                      +{fmt(Math.abs(diff))}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
-      {/* Últimos 5 Abastecimentos - Moto */}
-      {combustiveis.moto.length > 0 && (
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
-          <SectionTitle>🏍️ Últimos Abastecimentos - Moto</SectionTitle>
-          <div className="space-y-2">
-            {combustiveis.moto.slice(0, 5).map((d) => {
-              const userColors = getUserColors(d.buyer)
-              return (
-                <ListItem key={d._id} borderColor={userColors.hex}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium">{d.buyer}</p>
-                      <p className="text-white/40 text-xs">{formatDateFull(d.createdAt)}</p>
-                      {d.description && (
-                        <p className="text-white/30 text-xs truncate mt-1">{d.description}</p>
-                      )}
-                    </div>
-                    <p className="text-white text-sm font-semibold">{fmt(d.total_value)}</p>
-                  </div>
-                </ListItem>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {/* Últimos Abastecimentos - Expander */}
+      {(combustiveis.moto.length > 0 || combustiveis.carro.length > 0) && (
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden">
+          <button
+            onClick={() => setShowUltimos(!showUltimos)}
+            className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Fuel size={16} className="text-white/40" />
+              <span className="text-white font-medium text-sm">Últimos Abastecimentos</span>
+              <span className="text-white/30 text-xs">({combustiveis.moto.length + combustiveis.carro.length})</span>
+            </div>
+            <ChevronDown size={16} className={`text-white/40 transition-transform ${showUltimos ? 'rotate-180' : ''}`} />
+          </button>
 
-      {/* Últimos 5 Abastecimentos - Carro */}
-      {combustiveis.carro.length > 0 && (
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
-          <SectionTitle>🚗 Últimos Abastecimentos - Carro</SectionTitle>
-          <div className="space-y-2">
-            {combustiveis.carro.slice(0, 5).map((d) => {
-              const userColors = getUserColors(d.buyer)
-              return (
-                <ListItem key={d._id} borderColor={userColors.hex}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium">{d.buyer}</p>
-                      <p className="text-white/40 text-xs">{formatDateFull(d.createdAt)}</p>
-                      {d.description && (
-                        <p className="text-white/30 text-xs truncate mt-1">{d.description}</p>
-                      )}
-                    </div>
-                    <p className="text-white text-sm font-semibold">{fmt(d.total_value)}</p>
+          {showUltimos && (
+            <div className="px-5 pb-5 grid grid-cols-2 gap-4">
+              {/* Moto */}
+              <div>
+                <p className="text-white/50 text-xs font-medium mb-2">🏍️ Moto</p>
+                {combustiveis.moto.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {combustiveis.moto.slice(0, 5).map((d) => (
+                      <div key={d._id} className={`p-2.5 rounded-xl bg-base-800/40 border-l-2`} style={{ borderLeftColor: getUserColors(d.buyer).hex }}>
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-white text-xs font-medium truncate">{d.buyer}</p>
+                          <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(d.total_value)}</p>
+                        </div>
+                        <p className="text-white/30 text-[10px] mt-0.5">{formatDateFull(d.createdAt)}</p>
+                        {d.description && <p className="text-white/20 text-[10px] truncate">{d.description}</p>}
+                      </div>
+                    ))}
                   </div>
-                </ListItem>
-              )
-            })}
-          </div>
+                ) : (
+                  <p className="text-white/20 text-xs">Nenhum</p>
+                )}
+              </div>
+
+              {/* Carro */}
+              <div>
+                <p className="text-white/50 text-xs font-medium mb-2">🚗 Carro</p>
+                {combustiveis.carro.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {combustiveis.carro.slice(0, 5).map((d) => (
+                      <div key={d._id} className={`p-2.5 rounded-xl bg-base-800/40 border-l-2`} style={{ borderLeftColor: getUserColors(d.buyer).hex }}>
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-white text-xs font-medium truncate">{d.buyer}</p>
+                          <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(d.total_value)}</p>
+                        </div>
+                        <p className="text-white/30 text-[10px] mt-0.5">{formatDateFull(d.createdAt)}</p>
+                        {d.description && <p className="text-white/20 text-[10px] truncate">{d.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-white/20 text-xs">Nenhum</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

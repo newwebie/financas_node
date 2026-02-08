@@ -331,21 +331,17 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
     return `Novo ${tipoObj?.label}`
   }
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header com botão de voltar */}
-      <div className="flex items-center gap-3">
-        {tipo && (
-          <button
-            onClick={() => setTipo(null)}
-            className="w-10 h-10 rounded-xl bg-base-700/50 border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors"
-          >
-            <ArrowLeft size={18} className="text-white/60" />
-          </button>
-        )}
-        <h1 className="text-2xl font-semibold text-white">{getTituloAtual()}</h1>
-      </div>
+  const tipoColors = {
+    moto: 'from-amber-500/20 to-amber-600/10 border-amber-500/20 text-amber-400',
+    carro: 'from-sky-500/20 to-sky-600/10 border-sky-500/20 text-sky-400',
+    gasto: 'from-mint-500/20 to-mint-600/10 border-mint-500/20 text-mint-400',
+    emprestei: 'from-lavender-500/20 to-lavender-600/10 border-lavender-500/20 text-lavender-400',
+    devo: 'from-peach-500/20 to-peach-600/10 border-peach-500/20 text-peach-400',
+    'conta-fixa': 'from-slate-400/20 to-slate-500/10 border-slate-400/20 text-slate-300',
+  }
 
+  return (
+    <div className="animate-fade-in">
       {/* Feedback Toast */}
       {feedback && (
         <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-2xl shadow-lg animate-slide-up
@@ -357,30 +353,41 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
         </div>
       )}
 
-      {/* Seletor de Tipo - Só mostra se nenhum tipo foi selecionado */}
+      {/* Seletor de Tipo - Centralizado na tela */}
       {!tipo && (
-        <div className="grid grid-cols-2 gap-3">
-          {TIPOS.map((t, idx) => {
-            const Icon = t.icon
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTipo(t.id)}
-                className="p-6 rounded-3xl border bg-base-700/30 border-white/5 hover:border-white/10 hover:bg-base-700/50 transition-all duration-200 group"
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                <Icon size={28} className="text-white/40 group-hover:text-white/70 transition-colors mb-3" />
-                <p className="text-base font-medium text-white/70 group-hover:text-white transition-colors">
-                  {t.label}
-                </p>
-              </button>
-            )
-          })}
+        <div className="flex flex-col items-center justify-center min-h-[70vh]">
+          <p className="text-white/30 text-xs uppercase tracking-widest mb-6">Novo Registro</p>
+          <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
+            {TIPOS.map((t) => {
+              const Icon = t.icon
+              const colorClass = tipoColors[t.id]
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTipo(t.id)}
+                  className={`flex flex-col items-center justify-center gap-2.5 p-4 rounded-2xl bg-gradient-to-b border backdrop-blur-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.96] ${colorClass}`}
+                >
+                  <Icon size={22} className="opacity-80" />
+                  <span className="text-[11px] font-medium opacity-70">{t.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
       {/* Formulários - Só mostra quando um tipo está selecionado */}
       {tipo && (
+        <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setTipo(null)}
+            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all active:scale-95"
+          >
+            <ArrowLeft size={16} className="text-white/60" />
+          </button>
+          <h1 className="text-lg font-semibold text-white">{getTituloAtual()}</h1>
+        </div>
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5 animate-slide-up">
         {tipo === 'moto' && (
           <div className="space-y-4">
@@ -424,7 +431,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
             <button
               onClick={handleAbastecimentoMoto}
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-medium transition-all disabled:opacity-50 bg-mint-500 text-white hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all disabled:opacity-50 bg-gradient-to-r from-mint-500 to-mint-400 text-white shadow-lg shadow-mint-500/20 hover:shadow-mint-500/30 hover:brightness-110 active:scale-[0.98]"
             >
               {loading ? 'Salvando...' : 'Registrar'}
             </button>
@@ -473,7 +480,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
             <button
               onClick={handleAbastecimentoCarro}
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-medium transition-all disabled:opacity-50 bg-mint-500 text-white hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all disabled:opacity-50 bg-gradient-to-r from-mint-500 to-mint-400 text-white shadow-lg shadow-mint-500/20 hover:shadow-mint-500/30 hover:brightness-110 active:scale-[0.98]"
             >
               {loading ? 'Salvando...' : 'Registrar'}
             </button>
@@ -594,7 +601,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
             <button
               onClick={handleSalvarGasto}
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-medium transition-all disabled:opacity-50 bg-mint-500 text-white hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all disabled:opacity-50 bg-gradient-to-r from-mint-500 to-mint-400 text-white shadow-lg shadow-mint-500/20 hover:shadow-mint-500/30 hover:brightness-110 active:scale-[0.98]"
             >
               {loading ? 'Salvando...' : 'Salvar Gasto'}
             </button>
@@ -652,7 +659,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
             <button
               onClick={handleSalvarEmprestei}
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-medium transition-all disabled:opacity-50 bg-mint-500 text-white hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all disabled:opacity-50 bg-gradient-to-r from-lavender-500 to-lavender-400 text-white shadow-lg shadow-lavender-500/20 hover:shadow-lavender-500/30 hover:brightness-110 active:scale-[0.98]"
             >
               {loading ? 'Salvando...' : 'Salvar Empréstimo'}
             </button>
@@ -720,7 +727,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
             <button
               onClick={handleSalvarDevo}
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-medium transition-all disabled:opacity-50 bg-mint-500 text-white hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all disabled:opacity-50 bg-gradient-to-r from-peach-500 to-peach-400 text-white shadow-lg shadow-peach-500/20 hover:shadow-peach-500/30 hover:brightness-110 active:scale-[0.98]"
             >
               {loading ? 'Salvando...' : 'Salvar Dívida'}
             </button>
@@ -827,12 +834,13 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
             <button
               onClick={handleSalvarContaFixa}
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-medium transition-all disabled:opacity-50 bg-mint-500 text-white hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3.5 rounded-2xl font-semibold text-sm transition-all disabled:opacity-50 bg-gradient-to-r from-mint-500 to-mint-400 text-white shadow-lg shadow-mint-500/20 hover:shadow-mint-500/30 hover:brightness-110 active:scale-[0.98]"
             >
               {loading ? 'Salvando...' : 'Criar Conta Fixa'}
             </button>
           </div>
         )}
+        </div>
         </div>
       )}
     </div>

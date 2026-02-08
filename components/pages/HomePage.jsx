@@ -252,88 +252,94 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Hero Card - Total do Período */}
-      <div className={`relative overflow-hidden bg-gradient-to-br ${colors.gradient} rounded-3xl p-8 border border-white/10`}>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-        <div className="relative">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <p className="text-white/60 text-sm font-medium mb-1">Período da Fatura</p>
-              <p className="text-white/80 text-xs">
-                {formatDateFull(periodo.dataInicio)} - {formatDateFull(periodo.dataFim)}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-              <Wallet size={24} className="text-white" />
-            </div>
+      {/* Período da Fatura */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-white/40 text-[10px] md:text-xs font-medium">Período da Fatura</p>
+          <p className="text-white/60 text-xs md:text-sm">
+            {formatDateFull(periodo.dataInicio)} - {formatDateFull(periodo.dataFim)}
+          </p>
+        </div>
+      </div>
+
+      {/* Hero Card - Total de Gastos */}
+      <div className={`relative overflow-hidden bg-gradient-to-br ${colors.gradient} rounded-2xl md:rounded-3xl p-4 md:p-6 border border-white/10`}>
+        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <p className="text-white/70 text-[10px] md:text-sm font-medium mb-1">Total de Gastos</p>
+            <p className="text-white text-3xl md:text-5xl font-bold tracking-tight">{fmt(stats.gastos)}</p>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-white/70 text-sm font-medium">Total de Gastos</h2>
-            <p className="text-white text-5xl font-bold tracking-tight">{fmt(stats.gastos)}</p>
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
+            <Wallet size={20} className="text-white md:hidden" />
+            <Wallet size={24} className="text-white hidden md:block" />
           </div>
         </div>
       </div>
 
       {/* Quick Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         {/* Cofrinho */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-5 hover:border-mint-400/30 transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-mint-500/20 flex items-center justify-center">
-              <PiggyBank size={20} className="text-mint-400" />
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 hover:border-mint-400/30 transition-all">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-mint-500/20 flex items-center justify-center">
+              <PiggyBank size={16} className="text-mint-400 md:hidden" />
+              <PiggyBank size={20} className="text-mint-400 hidden md:block" />
             </div>
-            <span className="text-mint-400 text-xs font-medium px-2 py-1 bg-mint-500/10 rounded-lg">
+            <span className="text-mint-400 text-[10px] md:text-xs font-medium px-1.5 py-0.5 md:px-2 md:py-1 bg-mint-500/10 rounded-lg">
               Economia
             </span>
           </div>
-          <p className="text-white/50 text-xs mb-1">Cofrinho</p>
-          <p className="text-white text-2xl font-bold">{fmt(stats.cofrinho)}</p>
+          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1">Cofrinho</p>
+          <p className="text-white text-base md:text-2xl font-bold">{fmt(stats.cofrinho)}</p>
         </div>
 
         {/* Renda Variável */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-5 hover:border-peach-400/30 transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-peach-500/20 flex items-center justify-center">
-              <Coins size={20} className="text-peach-400" />
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 hover:border-peach-400/30 transition-all">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-peach-500/20 flex items-center justify-center">
+              <Coins size={16} className="text-peach-400 md:hidden" />
+              <Coins size={20} className="text-peach-400 hidden md:block" />
             </div>
-            <span className="text-peach-400 text-xs font-medium px-2 py-1 bg-peach-500/10 rounded-lg">
+            <span className="text-peach-400 text-[10px] md:text-xs font-medium px-1.5 py-0.5 md:px-2 md:py-1 bg-peach-500/10 rounded-lg">
               Investimentos
             </span>
           </div>
-          <p className="text-white/50 text-xs mb-1">Renda Variável</p>
-          <p className="text-white text-2xl font-bold">{fmt(stats.extra)}</p>
+          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1">Renda Variável</p>
+          <p className="text-white text-base md:text-2xl font-bold">{fmt(stats.extra)}</p>
         </div>
 
         {/* Taxa de Economia */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-5 hover:border-lavender-400/30 transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-lavender-500/20 flex items-center justify-center">
-              <TrendingUp size={20} className="text-lavender-400" />
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 hover:border-lavender-400/30 transition-all">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-lavender-500/20 flex items-center justify-center">
+              <TrendingUp size={16} className="text-lavender-400 md:hidden" />
+              <TrendingUp size={20} className="text-lavender-400 hidden md:block" />
             </div>
-            <span className="text-lavender-400 text-xs font-medium px-2 py-1 bg-lavender-500/10 rounded-lg">
+            <span className="text-lavender-400 text-[10px] md:text-xs font-medium px-1.5 py-0.5 md:px-2 md:py-1 bg-lavender-500/10 rounded-lg">
               {economiaPercent.toFixed(1)}%
             </span>
           </div>
-          <p className="text-white/50 text-xs mb-1">Total Economizado</p>
-          <p className="text-white text-2xl font-bold">{fmt(economia)}</p>
+          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1">Total Economizado</p>
+          <p className="text-white text-base md:text-2xl font-bold">{fmt(economia)}</p>
         </div>
       </div>
 
       {/* Data Visualization Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4">
         {/* Donut Chart - Distribuição por Categoria */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-6">
-          <h3 className="text-white font-semibold mb-6">Distribuição de Gastos</h3>
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl md:rounded-3xl p-3 md:p-6">
+          <h3 className="text-white font-semibold text-xs md:text-base mb-3 md:mb-6">Distribuição de Gastos</h3>
           {chartData.length > 0 ? (
             <div>
-              <ResponsiveContainer width="100%" height={220}>
+              <ResponsiveContainer width="100%" height={160} className="md:!h-[220px]">
                 <PieChart>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
+                    innerRadius="35%"
+                    outerRadius="55%"
                     paddingAngle={3}
                     dataKey="value"
                   >
@@ -344,26 +350,26 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="grid grid-cols-2 gap-2 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2 mt-2 md:mt-4">
                 {chartData.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-white/60 text-xs truncate">{item.name}</span>
+                  <div key={idx} className="flex items-center gap-1.5 md:gap-2">
+                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="text-white/60 text-[10px] md:text-xs truncate">{item.name}</span>
                   </div>
                 ))}
               </div>
 
               {/* Detalhes da Categoria "Outros" */}
               {outrosDetalhes.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="mt-2 md:mt-4 pt-2 md:pt-4 border-t border-white/10">
                   <button
                     onClick={() => setShowOutrosDetalhes(!showOutrosDetalhes)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-white/5 transition-colors"
+                    className="w-full flex items-center justify-between px-1 md:px-3 py-1.5 md:py-2 rounded-xl hover:bg-white/5 transition-colors"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-[#94a3b8]" />
-                      <span className="text-white text-sm font-medium">Ver detalhes de "Outros"</span>
-                      <span className="text-white/40 text-xs">({outrosDetalhes.length} categorias)</span>
+                    <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                      <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-[#94a3b8] flex-shrink-0" />
+                      <span className="text-white text-[10px] md:text-sm font-medium truncate">Outros</span>
+                      <span className="text-white/40 text-[10px] md:text-xs hidden md:inline">({outrosDetalhes.length} categorias)</span>
                     </div>
                     <ChevronDown
                       size={16}
@@ -432,49 +438,77 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
               )}
             </div>
           ) : (
-            <div className="h-[220px] flex items-center justify-center">
-              <p className="text-white/30 text-sm">Nenhuma despesa no período</p>
+            <div className="h-[160px] md:h-[220px] flex items-center justify-center">
+              <p className="text-white/30 text-[10px] md:text-sm">Nenhuma despesa no período</p>
             </div>
           )}
         </div>
 
         {/* Top 3 Categorias */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-6">
-          <h3 className="text-white font-semibold mb-6">Top Categorias</h3>
-          <div className="space-y-4">
-            {categorias.slice(0, 3).map((cat, idx) => {
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl md:rounded-3xl p-3 md:p-6">
+          <h3 className="text-white font-semibold text-xs md:text-base mb-3 md:mb-6">Top Categorias</h3>
+          <div className="space-y-3 md:space-y-4">
+            {categorias.slice(0, 5).map((cat, idx) => {
               const percent = stats.gastos > 0 ? (cat.valor / stats.gastos) * 100 : 0
               const rankColors = [
                 'bg-amber-500/20 text-amber-400 border-amber-500/30',
                 'bg-slate-400/20 text-slate-300 border-slate-400/30',
                 'bg-orange-400/20 text-orange-300 border-orange-400/30',
+                'text-white/40 border-white/10',
+                'text-white/40 border-white/10',
               ]
               return (
-                <div key={cat.categoria} className="flex items-center gap-4">
-                  <div className={`w-9 h-9 rounded-xl border flex items-center justify-center text-sm font-bold flex-shrink-0 ${rankColors[idx]}`}>
+                <div key={cat.categoria} className="flex items-center gap-2 md:gap-4">
+                  <div className={`w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl border flex items-center justify-center text-[10px] md:text-sm font-bold flex-shrink-0 ${rankColors[idx]}`}>
                     {idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white text-sm font-medium truncate">
+                    <div className="flex items-center justify-between mb-1 md:mb-2">
+                      <p className="text-white text-[10px] md:text-sm font-medium truncate">
                         {CATEGORIAS.find(c => c.id === cat.categoria)?.label || cat.categoria}
                       </p>
-                      <p className="text-white/60 text-xs ml-2">{percent.toFixed(0)}%</p>
+                      <p className="text-white/60 text-[10px] md:text-xs ml-1 md:ml-2">{percent.toFixed(0)}%</p>
                     </div>
-                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 md:h-2 bg-white/5 rounded-full overflow-hidden">
                       <div
                         className={`h-full bg-gradient-to-r ${colors.gradient}`}
                         style={{ width: `${percent}%` }}
                       />
                     </div>
-                    <p className="text-white/40 text-xs mt-1">{fmt(cat.valor)}</p>
+                    <p className="text-white/40 text-[10px] md:text-xs mt-0.5 md:mt-1">{fmt(cat.valor)}</p>
                   </div>
                 </div>
               )
             })}
+            {categorias.length > 5 && (() => {
+              const menorCat = categorias[categorias.length - 1]
+              const menorPercent = stats.gastos > 0 ? (menorCat.valor / stats.gastos) * 100 : 0
+              return (
+                <div className="flex items-center gap-2 md:gap-4 pt-2 md:pt-3 border-t border-white/5">
+                  <div className="w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl border border-white/10 flex items-center justify-center text-[10px] md:text-sm font-bold flex-shrink-0 text-white/30">
+                    -1
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1 md:mb-2">
+                      <p className="text-white/50 text-[10px] md:text-sm font-medium truncate">
+                        {CATEGORIAS.find(c => c.id === menorCat.categoria)?.label || menorCat.categoria}
+                      </p>
+                      <p className="text-white/40 text-[10px] md:text-xs ml-1 md:ml-2">{menorPercent.toFixed(0)}%</p>
+                    </div>
+                    <div className="w-full h-1.5 md:h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full bg-gradient-to-r ${colors.gradient} opacity-30`}
+                        style={{ width: `${menorPercent}%` }}
+                      />
+                    </div>
+                    <p className="text-white/30 text-[10px] md:text-xs mt-0.5 md:mt-1">{fmt(menorCat.valor)}</p>
+                  </div>
+                </div>
+              )
+            })()}
             {categorias.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-white/30 text-sm">Nenhuma categoria registrada</p>
+              <div className="text-center py-4 md:py-8">
+                <p className="text-white/30 text-[10px] md:text-sm">Nenhuma categoria registrada</p>
               </div>
             )}
           </div>
@@ -482,26 +516,35 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       </div>
 
       {/* Financial Health Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         {/* Saldo com outra pessoa */}
         <div
           onClick={() => openAcerto && openAcerto('pendentes')}
-          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
+          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.saldo > 0 ? 'border-mint-500/30' : situacao.saldo < 0 ? 'border-coral-500/30' : 'border-white/5'
         }`}>
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-3">
             {situacao.saldo > 0 ? (
-              <ArrowUpRight className="text-mint-400" size={20} />
+              <>
+                <ArrowUpRight className="text-mint-400 md:hidden" size={16} />
+                <ArrowUpRight className="text-mint-400 hidden md:block" size={20} />
+              </>
             ) : situacao.saldo < 0 ? (
-              <ArrowDownRight className="text-coral-400" size={20} />
+              <>
+                <ArrowDownRight className="text-coral-400 md:hidden" size={16} />
+                <ArrowDownRight className="text-coral-400 hidden md:block" size={20} />
+              </>
             ) : (
-              <CircleCheck className="text-white/40" size={20} />
+              <>
+                <CircleCheck className="text-white/40 md:hidden" size={16} />
+                <CircleCheck className="text-white/40 hidden md:block" size={20} />
+              </>
             )}
-            <p className="text-white/60 text-xs font-medium">
+            <p className="text-white/60 text-[10px] md:text-xs font-medium truncate">
               {situacao.saldo > 0 ? `${outro} te deve` : situacao.saldo < 0 ? `Você deve` : 'Acertos'}
             </p>
           </div>
-          <p className={`text-2xl font-bold ${
+          <p className={`text-base md:text-2xl font-bold ${
             situacao.saldo > 0 ? 'text-mint-400' : situacao.saldo < 0 ? 'text-coral-400' : 'text-white/40'
           }`}>
             {situacao.saldo === 0 ? 'Em dia' : fmt(Math.abs(situacao.saldo))}
@@ -511,14 +554,15 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         {/* Dívidas */}
         <div
           onClick={() => openAcerto && openAcerto('dividas')}
-          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
+          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.dividasTerceiros > 0 ? 'border-peach-500/30' : 'border-white/5'
         }`}>
-          <div className="flex items-center gap-3 mb-3">
-            <CircleAlert className={situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} size={20} />
-            <p className="text-white/60 text-xs font-medium">Dívidas</p>
+          <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-3">
+            <CircleAlert className={`${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} md:hidden`} size={16} />
+            <CircleAlert className={`${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} hidden md:block`} size={20} />
+            <p className="text-white/60 text-[10px] md:text-xs font-medium">Dívidas</p>
           </div>
-          <p className={`text-2xl font-bold ${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'}`}>
+          <p className={`text-base md:text-2xl font-bold ${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'}`}>
             {situacao.dividasTerceiros > 0 ? fmt(situacao.dividasTerceiros) : 'Nenhuma'}
           </p>
         </div>
@@ -526,14 +570,15 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         {/* Empréstimos a Terceiros */}
         <div
           onClick={() => openAcerto && openAcerto('emprestimos')}
-          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
+          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.emprestimosTerceiros > 0 ? 'border-lavender-500/30' : 'border-white/5'
         }`}>
-          <div className="flex items-center gap-3 mb-3">
-            <TrendingUp className={situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'} size={20} />
-            <p className="text-white/60 text-xs font-medium">A Receber</p>
+          <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-3">
+            <TrendingUp className={`${situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'} md:hidden`} size={16} />
+            <TrendingUp className={`${situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'} hidden md:block`} size={20} />
+            <p className="text-white/60 text-[10px] md:text-xs font-medium">A Receber</p>
           </div>
-          <p className={`text-2xl font-bold ${situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'}`}>
+          <p className={`text-base md:text-2xl font-bold ${situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'}`}>
             {situacao.emprestimosTerceiros > 0 ? fmt(situacao.emprestimosTerceiros) : 'Nenhum'}
           </p>
         </div>
