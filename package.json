@@ -11,7 +11,10 @@
   "dependencies": {
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.2.35"
+    "next": "14.2.35",
+    "lucide-react": "^0.263.1",
+    "recharts": "^2.12.7",
+    "mongodb": "^6.3.0"
   },
   "devDependencies": {
     "postcss": "^8",
