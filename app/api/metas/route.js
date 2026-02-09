@@ -18,9 +18,11 @@ export async function POST(request) {
   try {
     const body = await request.json()
     const colls = await getCollections()
+    const limite = body.valor_limite || body.limite
     const result = await colls.metas.insertOne({
-      categoria: body.categoria, pessoa: body.pessoa,
-      limite: body.limite, ativo: true, createdAt: new Date(),
+      categoria: body.categoria, pessoa: body.user || body.pessoa,
+      limite, ativo: true, createdAt: new Date(),
+      historico_limites: [{ limite, desde: new Date() }],
     })
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch (error) {
@@ -33,7 +35,14 @@ export async function PUT(request) {
     const body = await request.json()
     const colls = await getCollections()
     const { _id, ...data } = body
-    await colls.metas.updateOne({ _id: new ObjectId(_id) }, { $set: data })
+    if (data.limite !== undefined) {
+      await colls.metas.updateOne({ _id: new ObjectId(_id) }, {
+        $set: data,
+        $push: { historico_limites: { limite: data.limite, desde: new Date() } },
+      })
+    } else {
+      await colls.metas.updateOne({ _id: new ObjectId(_id) }, { $set: data })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

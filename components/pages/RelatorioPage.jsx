@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { SectionTitle, Skeleton } from '@/components/ui/Cards'
 import { fmt, formatDateFull, getCategoryEmoji, calcPeriodoFatura, CATEGORIAS } from '@/lib/helpers'
-import { ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, Shield, PiggyBank, CreditCard, ShoppingBag, Calendar, Flame } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, Shield, PiggyBank, CreditCard, ShoppingBag, Calendar, Flame, Landmark } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 export default function RelatorioPage({ user, outro, colors, refreshKey, triggerRefresh }) {
@@ -19,6 +19,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
   const [expandParcelas, setExpandParcelas] = useState(false)
   const [expandContas, setExpandContas] = useState(false)
   const [expandDespesas, setExpandDespesas] = useState(false)
+  const [expandCartao, setExpandCartao] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -40,13 +41,13 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       const periodoDoisAtras = calcPeriodoFatura(cfg, user, mesesAtras + 2)
 
       setDespesas(desp)
-      setContasFixas(cf.filter(c => c.buyer === user))
+      setContasFixas(cf.filter(c => c.buyer === user || c.responsavel === user))
       setConfig(cfg)
       setMetas(metasData)
       setDividasTerceiros(dividas)
       setPeriodos({ atual: periodoAtual, anterior: periodoAnterior, doisAtras: periodoDoisAtras })
 
-      calcularMetricas(desp, cf.filter(c => c.buyer === user), metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras)
+      calcularMetricas(desp, cf.filter(c => c.buyer === user || c.responsavel === user), metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras)
     } catch (error) {
       console.error('Erro ao carregar relatório:', error)
     } finally {
@@ -72,6 +73,16 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     return total
   }
 
+  function getLimiteParaPeriodo(meta, periodoFim) {
+    if (!meta.historico_limites || meta.historico_limites.length === 0) {
+      return meta.limite // metas antigas sem histórico: usa limite atual
+    }
+    const entries = meta.historico_limites
+      .filter(h => new Date(h.desde) <= periodoFim)
+      .sort((a, b) => new Date(b.desde) - new Date(a.desde))
+    return entries.length > 0 ? entries[0].limite : meta.limite
+  }
+
   function calcularMetricas(allDespesas, fixas, metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras) {
     const despAtual = filtrarDespesasPeriodo(allDespesas, periodoAtual)
     const despAnterior = filtrarDespesasPeriodo(allDespesas, periodoAnterior)
@@ -81,7 +92,15 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     const totalAnterior = calcTotalPeriodo(despAnterior)
     const totalDoisAtras = calcTotalPeriodo(despDoisAtras)
 
-    // Economia (cofrinho + renda variavel no período)
+    // Cofrinho no período (economia real)
+    const cofrinhoItems = allDespesas.filter(d => {
+      const data = new Date(d.createdAt)
+      return data >= periodoAtual.dataInicio && data <= periodoAtual.dataFim && d.label === 'Cofrinho'
+    })
+    const totalCofrinho = cofrinhoItems.reduce((sum, d) => sum + d.total_value, 0)
+    const metaCofrinho = metasData.find(m => m.categoria === 'Cofrinho')
+
+    // Economia total (cofrinho + renda variavel) para exibição
     const economiaItems = allDespesas.filter(d => {
       const data = new Date(d.createdAt)
       return data >= periodoAtual.dataInicio && data <= periodoAtual.dataFim && (d.label === 'Cofrinho' || d.label === 'Renda Variavel')
@@ -89,7 +108,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     const totalEconomia = economiaItems.reduce((sum, d) => sum + d.total_value, 0)
 
     // Total fixas
-    const totalFixas = fixas.filter(c => c.payment_method !== 'Credito').reduce((sum, c) => sum + (c.valor || 0), 0)
+    const totalFixas = fixas.filter(c => !c.cartao_credito).reduce((sum, c) => sum + (c.valor || 0), 0)
     const totalMes = totalAtual + totalFixas
 
     // Métricas básicas
@@ -117,18 +136,70 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       if (d.tem_pendencia && d.valor_pendente) valor -= d.valor_pendente
       gastosPorCategoria[d.label] = (gastosPorCategoria[d.label] || 0) + valor
     })
+    // Incluir contas fixas nas categorias (são mensais, entram em todo período)
+    fixas.forEach(c => {
+      const cat = c.categoria || 'Outros'
+      gastosPorCategoria[cat] = (gastosPorCategoria[cat] || 0) + (c.valor || 0)
+    })
 
-    // Gastos vs Metas
-    const metasComGasto = metasData.map(m => ({
-      ...m,
-      gasto: gastosPorCategoria[m.categoria] || 0,
-      percent: m.limite > 0 ? ((gastosPorCategoria[m.categoria] || 0) / m.limite) * 100 : 0,
-    })).sort((a, b) => b.percent - a.percent)
+    // Gastos por categoria - período anterior (para comparação)
+    const gastosPorCategoriaAnterior = {}
+    despAnterior.forEach(d => {
+      let valor = d.total_value
+      if (d.installment > 1) valor = valor / d.installment
+      if (d.tem_pendencia && d.valor_pendente) valor -= d.valor_pendente
+      gastosPorCategoriaAnterior[d.label] = (gastosPorCategoriaAnterior[d.label] || 0) + valor
+    })
+    // Contas fixas também no período anterior (são recorrentes)
+    fixas.forEach(c => {
+      const cat = c.categoria || 'Outros'
+      gastosPorCategoriaAnterior[cat] = (gastosPorCategoriaAnterior[cat] || 0) + (c.valor || 0)
+    })
+
+    // Comparação categorias (anterior vs atual)
+    const todasCats = new Set([...Object.keys(gastosPorCategoria), ...Object.keys(gastosPorCategoriaAnterior)])
+    const comparacaoCategorias = [...todasCats].map(cat => {
+      const atual = gastosPorCategoria[cat] || 0
+      const anterior = gastosPorCategoriaAnterior[cat] || 0
+      const variacao = anterior > 0 ? ((atual - anterior) / anterior) * 100 : (atual > 0 ? 100 : 0)
+      return { categoria: cat, atual, anterior, variacao }
+    }).filter(c => c.atual > 0 || c.anterior > 0)
+      .sort((a, b) => b.variacao - a.variacao)
+
+    // Gastos vs Metas (Cofrinho usa totalCofrinho pois é excluído de despAtual)
+    const metasComGasto = metasData.map(m => {
+      const gasto = m.categoria === 'Cofrinho' ? totalCofrinho : (gastosPorCategoria[m.categoria] || 0)
+      const limite = getLimiteParaPeriodo(m, periodoAtual.dataFim)
+      return {
+        ...m,
+        gasto,
+        limite,
+        percent: limite > 0 ? (gasto / limite) * 100 : 0,
+        isCofrinho: m.categoria === 'Cofrinho',
+      }
+    }).sort((a, b) => b.percent - a.percent)
 
     // Controle de cartão
-    const faturaEstimada = despAtual.filter(d => d.payment_method === 'Credito' && d.installment <= 1).reduce((sum, d) => sum + d.total_value, 0)
-    const parcelasAtivas = allDespesas.filter(d => d.installment > 1 && d.payment_method === 'Credito')
-    const proximoMes = parcelasAtivas.reduce((sum, d) => sum + (d.total_value / d.installment), 0)
+    const comprasCreditoItems = despAtual.filter(d => d.payment_method === 'Credito' && d.installment <= 1)
+    const comprasCredito = comprasCreditoItems.reduce((sum, d) => sum + d.total_value, 0)
+    const fixasCreditoItems = fixas.filter(c => c.cartao_credito)
+    const refDate = periodoAtual.dataInicio
+    const parcelasAtivas = allDespesas.filter(d => {
+      if (d.installment <= 1 || d.payment_method !== 'Credito') return false
+      const dc = new Date(d.createdAt)
+      const meses = (refDate.getFullYear() - dc.getFullYear()) * 12 + (refDate.getMonth() - dc.getMonth())
+      return meses < d.installment
+    })
+    const parcelasMes = parcelasAtivas.reduce((sum, d) => sum + (d.total_value / d.installment), 0)
+    const fixasCredito = fixas.filter(c => c.cartao_credito).reduce((sum, c) => sum + (c.valor || 0), 0)
+    // Próximo mês: só parcelas que ainda estarão ativas (meses + 1 < installment)
+    const parcelasProxMes = parcelasAtivas.filter(d => {
+      const dc = new Date(d.createdAt)
+      const meses = (refDate.getFullYear() - dc.getFullYear()) * 12 + (refDate.getMonth() - dc.getMonth())
+      return meses + 1 < d.installment
+    })
+    const proximoMes = parcelasProxMes.reduce((sum, d) => sum + (d.total_value / d.installment), 0) + fixasCredito
+    const faturaEstimada = comprasCredito + parcelasMes + fixasCredito
     const compromissoTotal = parcelasAtivas.reduce((sum, d) => sum + d.total_value, 0)
 
     // Gastos por método de pagamento
@@ -137,6 +208,11 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       let valor = d.total_value
       if (d.installment > 1) valor = valor / d.installment
       gastosPorPagamento[d.payment_method] = (gastosPorPagamento[d.payment_method] || 0) + valor
+    })
+    // Incluir contas fixas nos pagamentos
+    fixas.forEach(c => {
+      const metodo = c.cartao_credito ? 'Credito' : 'Debito'
+      gastosPorPagamento[metodo] = (gastosPorPagamento[metodo] || 0) + (c.valor || 0)
     })
 
     // Top 3 gastos
@@ -154,18 +230,21 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     // ===== SCORE FINANCEIRO =====
     let score = 0
 
-    // 1. Economia (0-25 pts)
-    const totalGeral = totalAtual + totalEconomia
-    const taxaEconomia = totalGeral > 0 ? totalEconomia / totalGeral : 0
-    if (taxaEconomia >= 0.20) score += 25
-    else if (taxaEconomia >= 0.15) score += 20
-    else if (taxaEconomia >= 0.10) score += 15
-    else if (taxaEconomia >= 0.05) score += 10
-    else score += Math.round(taxaEconomia * 125)
+    // 1. Economia (0-25 pts) - baseado na meta de Cofrinho
+    const limiteCofrinho = metaCofrinho ? getLimiteParaPeriodo(metaCofrinho, periodoAtual.dataFim) : 0
+    let percentCofrinho = 0
+    if (metaCofrinho && limiteCofrinho > 0) {
+      percentCofrinho = totalCofrinho / limiteCofrinho
+      score += Math.min(25, Math.round(percentCofrinho * 25))
+    } else {
+      score += 12 // sem meta de cofrinho = neutro
+    }
 
     // 2. Metas (0-25 pts)
     if (metasComGasto.length > 0) {
-      const metasDentro = metasComGasto.filter(m => m.percent <= 100).length
+      const metasDentro = metasComGasto.filter(m =>
+        m.isCofrinho ? m.percent >= 100 : m.percent <= 100
+      ).length
       score += Math.round((metasDentro / metasComGasto.length) * 25)
     } else {
       score += 12
@@ -193,8 +272,9 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     score = Math.min(100, Math.max(0, score))
 
     const scoreBreakdown = {
-      economia: taxaEconomia,
-      metasDentro: metasComGasto.length > 0 ? metasComGasto.filter(m => m.percent <= 100).length : 0,
+      economia: percentCofrinho,
+      temMetaCofrinho: !!metaCofrinho,
+      metasDentro: metasComGasto.length > 0 ? metasComGasto.filter(m => m.isCofrinho ? m.percent >= 100 : m.percent <= 100).length : 0,
       metasTotal: metasComGasto.length,
       variacao,
       dividas: dividas.length,
@@ -205,8 +285,9 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       totalFixas, totalMes, mediaDia, mediaCompra, qtdCompras,
       diaMaisGasta, gastosPorDia, gastosPorCategoria, gastosPorPagamento,
       metasComGasto, faturaEstimada, proximoMes, compromissoTotal,
+      comprasCredito, parcelasMes, fixasCredito, comprasCreditoItems, fixasCreditoItems, parcelasProxMes,
       parcelasAtivas, top3, despesasPeriodo: despAtual,
-      tendencia, variacao, score, scoreBreakdown,
+      tendencia, variacao, score, scoreBreakdown, comparacaoCategorias,
     })
   }
 
@@ -233,7 +314,12 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     return `${meses[inicio.getMonth()]} ${inicio.getFullYear()}`
   }
 
-  const getMetaColor = (percent) => {
+  const getMetaColor = (percent, isCofrinho = false) => {
+    if (isCofrinho) {
+      if (percent >= 100) return '#6ee7b7' // verde = bateu a meta
+      if (percent >= 60) return '#fbbf24'   // amarelo = quase lá
+      return '#f87171'                       // vermelho = longe da meta
+    }
     if (percent >= 100) return '#f87171'
     if (percent >= 80) return '#fbbf24'
     return '#6ee7b7'
@@ -343,7 +429,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
               <div className="flex items-center gap-1.5">
                 <PiggyBank size={12} className="text-mint-400 flex-shrink-0" />
                 <span className="text-white/50 text-[10px] truncate">
-                  Economia {((metricas.scoreBreakdown?.economia || 0) * 100).toFixed(0)}%
+                  Cofrinho {metricas.scoreBreakdown?.temMetaCofrinho ? `${Math.min(100, ((metricas.scoreBreakdown?.economia || 0) * 100)).toFixed(0)}%` : 'Sem meta'}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -374,7 +460,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       </div>
 
       {/* Quick Metrics */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
           <p className="text-white/40 text-[10px] mb-1">Total</p>
           <p className="text-white font-bold text-sm">{fmt(metricas.totalAtual)}</p>
@@ -382,10 +468,6 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
           <p className="text-white/40 text-[10px] mb-1">Média/Dia</p>
           <p className="text-white font-bold text-sm">{fmt(metricas.mediaDia)}</p>
-        </div>
-        <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
-          <p className="text-white/40 text-[10px] mb-1">Compras</p>
-          <p className="text-white font-bold text-sm">{metricas.qtdCompras}</p>
         </div>
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
           <p className="text-white/40 text-[10px] mb-1">Ticket Médio</p>
@@ -440,6 +522,41 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
         </div>
       )}
 
+      {/* Comparação Mensal por Categoria */}
+      {metricas.comparacaoCategorias?.length > 0 && (
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <ShoppingBag size={16} className="text-white/40 flex-shrink-0" />
+            <span className="text-sm font-medium text-white/50">Comparação Mensal</span>
+          </div>
+          <div className="space-y-3">
+            {metricas.comparacaoCategorias.map(c => {
+              const catInfo = CATEGORIAS.find(cat => cat.id === c.categoria)
+              const isUp = c.variacao > 0
+              const isNew = c.anterior === 0 && c.atual > 0
+              const isGone = c.anterior > 0 && c.atual === 0
+              const varColor = isNew ? 'text-amber-400' : isGone ? 'text-mint-400' : isUp ? 'text-coral-400' : c.variacao < 0 ? 'text-mint-400' : 'text-white/40'
+              return (
+                <div key={c.categoria} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm">{catInfo?.emoji || '📦'}</span>
+                    <span className="text-white text-xs font-medium truncate">{catInfo?.label || c.categoria}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-white/40 text-[10px]">{fmt(c.anterior)}</span>
+                    <span className={`text-[10px] ${varColor}`}>{isUp ? '↑' : '↓'}</span>
+                    <span className="text-white text-[10px] font-medium">{fmt(c.atual)}</span>
+                    <span className={`text-[10px] font-medium ${varColor}`}>
+                      ({isNew ? 'Novo' : isGone ? '-100%' : `${c.variacao > 0 ? '+' : ''}${c.variacao.toFixed(0)}%`})
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Gastos vs Metas */}
       {metricas.metasComGasto?.length > 0 && (
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
@@ -449,7 +566,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
           </div>
           <div className="space-y-4">
             {metricas.metasComGasto.map((m) => {
-              const metaColor = getMetaColor(m.percent)
+              const metaColor = getMetaColor(m.percent, m.isCofrinho)
               const catInfo = CATEGORIAS.find(c => c.id === m.categoria)
               const restante = Math.max(0, m.limite - m.gasto)
               return (
@@ -479,11 +596,19 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                       }}
                     />
                   </div>
-                  {m.percent < 100 && (
-                    <p className="text-white/30 text-[10px] mt-1">Restam {fmt(restante)}</p>
-                  )}
-                  {m.percent >= 100 && (
-                    <p className="text-coral-400/60 text-[10px] mt-1">Estourou em {fmt(m.gasto - m.limite)}</p>
+                  {m.isCofrinho ? (
+                    m.percent >= 100
+                      ? <p className="text-mint-400/60 text-[10px] mt-1">Meta batida! +{fmt(m.gasto - m.limite)}</p>
+                      : <p className="text-white/30 text-[10px] mt-1">Faltam {fmt(restante)}</p>
+                  ) : (
+                    <>
+                      {m.percent < 100 && (
+                        <p className="text-white/30 text-[10px] mt-1">Restam {fmt(restante)}</p>
+                      )}
+                      {m.percent >= 100 && (
+                        <p className="text-coral-400/60 text-[10px] mt-1">Estourou em {fmt(m.gasto - m.limite)}</p>
+                      )}
+                    </>
                   )}
                 </div>
               )
@@ -553,34 +678,12 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
         )}
       </div>
 
-      {/* Controle de Cartão */}
-      <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard size={16} className="text-white/40" />
-          <SectionTitle className="mb-0">Controle de Cartão</SectionTitle>
-        </div>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-white/60 text-xs">Fatura Estimada</span>
-            <span className="text-white font-semibold text-sm">{fmt(metricas.faturaEstimada)}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-white/60 text-xs">Próx. Mês (Parcelas)</span>
-            <span className="text-white font-semibold text-sm">{fmt(metricas.proximoMes)}</span>
-          </div>
-          <div className="pt-2 border-t border-white/5 flex justify-between items-center">
-            <span className="text-white/60 text-xs">Compromisso Total</span>
-            <span className="text-coral-400 font-bold text-sm">{fmt(metricas.compromissoTotal)}</span>
-          </div>
-        </div>
-      </div>
-
       {/* Top Compras */}
       {metricas.top3?.length > 0 && (
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Flame size={16} className="text-amber-400" />
-            <SectionTitle className="mb-0">Maiores Gastos</SectionTitle>
+            <Flame size={16} className="text-amber-400 flex-shrink-0" />
+            <span className="text-sm font-medium text-white/50">Maiores Gastos</span>
           </div>
           <div className="space-y-2">
             {metricas.top3.map((d, idx) => (
@@ -601,6 +704,103 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
         </div>
       )}
 
+      {/* Controle de Cartão */}
+      <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <CreditCard size={16} className="text-white/40 flex-shrink-0" />
+          <span className="text-sm font-medium text-white/50">Controle de Cartão</span>
+        </div>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-white/60 text-xs">Fatura Estimada</span>
+            <span className="text-white font-semibold text-sm">{fmt(metricas.faturaEstimada)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-white/60 text-xs">Próx. Mês (Parcelas)</span>
+            <span className="text-white font-semibold text-sm">{fmt(metricas.proximoMes)}</span>
+          </div>
+          <div className="pt-2 border-t border-white/5 flex justify-between items-center">
+            <span className="text-white/60 text-xs">Compromisso Total</span>
+            <span className="text-coral-400 font-bold text-sm">{fmt(metricas.compromissoTotal)}</span>
+          </div>
+        </div>
+
+        {/* Breakdown para debug */}
+        <button
+          onClick={() => setExpandCartao(!expandCartao)}
+          className="w-full mt-3 pt-3 border-t border-white/5 flex items-center justify-between hover:bg-white/5 transition-colors rounded-lg px-1 py-1"
+        >
+          <span className="text-white/30 text-[10px]">Ver composição da fatura</span>
+          <ChevronDown size={14} className={`text-white/20 transition-transform ${expandCartao ? 'rotate-180' : ''}`} />
+        </button>
+        {expandCartao && (
+          <div className="mt-2 space-y-3">
+            {/* Compras à vista no crédito */}
+            <div>
+              <p className="text-white/50 text-[10px] font-medium mb-1">Compras à vista no crédito ({metricas.comprasCreditoItems?.length || 0}) — {fmt(metricas.comprasCredito)}</p>
+              <div className="space-y-1 ml-2">
+                {metricas.comprasCreditoItems?.map((d) => (
+                  <div key={d._id} className="flex items-center justify-between">
+                    <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{getCategoryEmoji(d.label)} {d.item}</p>
+                    <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(d.total_value)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Parcelas ativas */}
+            <div>
+              <p className="text-white/50 text-[10px] font-medium mb-1">Parcelas no mês ({metricas.parcelasAtivas?.length || 0}) — {fmt(metricas.parcelasMes)}</p>
+              <div className="space-y-1 ml-2">
+                {metricas.parcelasAtivas?.map((d) => {
+                  const ref = periodos.atual?.dataInicio || new Date()
+                  const dc = new Date(d.createdAt)
+                  const meses = (ref.getFullYear() - dc.getFullYear()) * 12 + (ref.getMonth() - dc.getMonth())
+                  const parcelaAtual = Math.min(meses + 1, d.installment)
+                  return (
+                    <div key={d._id} className="flex items-center justify-between">
+                      <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{getCategoryEmoji(d.label)} {d.item} ({parcelaAtual}/{d.installment})</p>
+                      <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(d.total_value / d.installment)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Contas fixas no crédito */}
+            <div>
+              <p className="text-white/50 text-[10px] font-medium mb-1">Contas fixas no crédito ({metricas.fixasCreditoItems?.length || 0}) — {fmt(metricas.fixasCredito)}</p>
+              <div className="space-y-1 ml-2">
+                {metricas.fixasCreditoItems?.map((c) => (
+                  <div key={c._id} className="flex items-center justify-between">
+                    <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{c.nome}</p>
+                    <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(c.valor)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Próximo mês breakdown */}
+            <div className="pt-2 border-t border-white/5">
+              <p className="text-white/50 text-[10px] font-medium mb-1">Próx. mês: parcelas que continuam ({metricas.parcelasProxMes?.length || 0}) + fixas crédito</p>
+              <div className="space-y-1 ml-2">
+                {metricas.parcelasProxMes?.map((d) => {
+                  const ref = periodos.atual?.dataInicio || new Date()
+                  const dc = new Date(d.createdAt)
+                  const meses = (ref.getFullYear() - dc.getFullYear()) * 12 + (ref.getMonth() - dc.getMonth())
+                  return (
+                    <div key={d._id} className="flex items-center justify-between">
+                      <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{getCategoryEmoji(d.label)} {d.item} ({meses + 2}/{d.installment})</p>
+                      <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(d.total_value / d.installment)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Parcelas Ativas */}
       {metricas.parcelasAtivas?.length > 0 && (
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden">
@@ -617,15 +817,21 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
           </button>
           {expandParcelas && (
             <div className="px-5 pb-4 space-y-2">
-              {metricas.parcelasAtivas.map((d) => (
-                <div key={d._id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03]">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs font-medium truncate">{getCategoryEmoji(d.label)} {d.item}</p>
-                    <p className="text-white/30 text-[10px]">{d.installment}x de {fmt(d.total_value / d.installment)}</p>
+              {metricas.parcelasAtivas.map((d) => {
+                const dc = new Date(d.createdAt)
+                const ref = periodos.atual?.dataInicio || new Date()
+                const meses = (ref.getFullYear() - dc.getFullYear()) * 12 + (ref.getMonth() - dc.getMonth())
+                const parcelaAtual = Math.min(meses + 1, d.installment)
+                return (
+                  <div key={d._id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03]">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium truncate">{getCategoryEmoji(d.label)} {d.item}</p>
+                      <p className="text-white/30 text-[10px]">Total {fmt(d.total_value)} · {parcelaAtual}/{d.installment}</p>
+                    </div>
+                    <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(d.total_value / d.installment)}/mês</p>
                   </div>
-                  <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(d.total_value)}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -652,7 +858,16 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                 <div key={c._id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03]">
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-xs font-medium">{c.nome}</p>
-                    <p className="text-white/30 text-[10px]">Vencimento: dia {c.dia_vencimento}</p>
+                    <div className="flex items-center gap-2 text-white/30">
+                      <div className="flex items-center gap-0.5">
+                        <Calendar size={9} />
+                        <span className="text-[10px]">{String(c.dia_vencimento).padStart(2, '0')}/{String((periodos.atual?.dataInicio || new Date()).getMonth() + 1).padStart(2, '0')}</span>
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        {c.cartao_credito ? <CreditCard size={9} /> : <Landmark size={9} />}
+                        <span className="text-[10px]">{c.cartao_credito ? 'Crédito' : 'Débito auto.'}</span>
+                      </div>
+                    </div>
                   </div>
                   <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(c.valor)}</p>
                 </div>

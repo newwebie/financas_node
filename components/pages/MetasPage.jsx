@@ -195,7 +195,7 @@ export default function MetasPage({ user, outro, colors, refreshKey, triggerRefr
         <div className="space-y-4">
           {metas.map((meta) => {
             const gasto = gastosCategoria[meta.categoria] || 0
-            const percentual = (gasto / meta.valor_limite) * 100
+            const percentual = (gasto / meta.limite) * 100
             const corBarra = getProgressColor(percentual)
 
             return (
@@ -206,7 +206,7 @@ export default function MetasPage({ user, outro, colors, refreshKey, triggerRefr
                       <h3 className="text-white font-medium">{getCategoryDisplay(meta.categoria)}</h3>
                       {getStatusBadge(percentual)}
                     </div>
-                    <p className="text-white/40 text-xs">Limite: {fmt(meta.valor_limite)}</p>
+                    <p className="text-white/40 text-xs">Limite: {fmt(meta.limite)}</p>
                   </div>
                   <div className="text-right">
                     <p className={`text-lg font-bold ${percentual >= 100 ? 'text-red-400' : percentual >= 80 ? 'text-amber-400' : 'text-white'}`}>
@@ -218,7 +218,7 @@ export default function MetasPage({ user, outro, colors, refreshKey, triggerRefr
                 <ProgressBar
                   label=""
                   value={gasto}
-                  max={meta.valor_limite}
+                  max={meta.limite}
                   color={corBarra}
                   showPercentage={false}
                 />

@@ -48,7 +48,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
 
       setData({ despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config })
       calcularStats(despesas, contasFixas, emprestimosTerceiros, periodoCalc)
-      calcularCategorias(despesas, periodoCalc)
+      calcularCategorias(despesas, contasFixas, periodoCalc)
       calcularSituacao(despesas, emprestimos, dividasTerceiros, emprestimosTerceiros)
       getRecentTransactions(despesas, periodoCalc)
     } catch (error) {
@@ -83,7 +83,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     })
 
     contasFixas.forEach(c => {
-      if (c.buyer === user && c.payment_method !== 'Debito') {
+      if (c.buyer === user || c.responsavel === user) {
         gastos += c.valor || 0
       }
     })
@@ -101,7 +101,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     setStats({ gastos, cofrinho, extra, total })
   }
 
-  function calcularCategorias(despesas, periodo) {
+  function calcularCategorias(despesas, contasFixas, periodo) {
     const catMap = {}
     const catItens = {}
 
@@ -129,6 +129,25 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         description: d.description,
         payment_method: d.payment_method
       })
+    })
+
+    // Incluir contas fixas nas categorias
+    contasFixas.forEach(c => {
+      if (c.buyer === user || c.responsavel === user) {
+        const cat = c.categoria || 'Outros'
+        if (!catMap[cat]) {
+          catMap[cat] = 0
+          catItens[cat] = []
+        }
+        catMap[cat] += c.valor || 0
+        catItens[cat].push({
+          item: c.nome || c.descricao || 'Conta Fixa',
+          valor: c.valor || 0,
+          data: null,
+          description: c.observacao || 'Conta fixa mensal',
+          payment_method: c.cartao_credito ? 'Credito' : 'Debito'
+        })
+      }
     })
 
     const categoriasList = Object.entries(catMap)

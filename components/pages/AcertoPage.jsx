@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ListItem, SectionTitle, EmptyState, Skeleton } from '@/components/ui/Cards'
 import { fmt, formatDateFull, getCategoryEmoji } from '@/lib/helpers'
-import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar, User, Pencil, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar, User, Pencil, Trash2, CreditCard, Landmark } from 'lucide-react'
 
 export default function AcertoPage({ user, outro, colors, refreshKey, triggerRefresh, focusSection, clearFocus, openEditItem }) {
   const [loading, setLoading] = useState(true)
@@ -562,10 +562,16 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-medium">{c.nome}</p>
-                      <p className="text-white/40 text-xs mt-1">
-                        Vencimento: dia {c.dia_vencimento}
-                        {c.debito_automatico && ' • Débito automático'}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1 text-white/40">
+                          <Calendar size={11} />
+                          <span className="text-xs">{String(c.dia_vencimento).padStart(2, '0')}/{String(new Date().getMonth() + 1).padStart(2, '0')}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-white/40">
+                          {c.cartao_credito ? <CreditCard size={11} /> : <Landmark size={11} />}
+                          <span className="text-xs">{c.cartao_credito ? 'Crédito' : 'Débito auto.'}</span>
+                        </div>
+                      </div>
                       {c.observacao && <p className="text-white/60 text-xs mt-1 truncate">{c.observacao}</p>}
                     </div>
                     <p className="text-pi-400 text-sm font-semibold">{fmt(c.valor)}</p>
