@@ -365,6 +365,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
   const pagamentoData = Object.entries(metricas.gastosPorPagamento || {})
     .map(([name, value]) => ({ name, value, color: pagamentoColors[name] || '#94a3b8' }))
     .sort((a, b) => b.value - a.value)
+  const totalPagamentos = pagamentoData.reduce((sum, p) => sum + p.value, 0)
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -654,7 +655,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
             <p className="text-white/50 text-[10px] md:text-xs font-medium mb-3">Pagamentos</p>
             <div className="space-y-2">
               {pagamentoData.map(({ name, value, color }) => {
-                const pct = metricas.totalAtual > 0 ? (value / metricas.totalAtual) * 100 : 0
+                const pct = totalPagamentos > 0 ? (value / totalPagamentos) * 100 : 0
                 return (
                   <div key={name}>
                     <div className="flex justify-between items-center mb-0.5">

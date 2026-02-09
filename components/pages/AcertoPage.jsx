@@ -191,8 +191,8 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
       const de = saldo.liquido > 0 ? outro : user
       const para = saldo.liquido > 0 ? user : outro
       const itensQuitados = [
-        ...data.despesas.map(d => ({ tipo: 'despesa', id: d._id, descricao: d.label })),
-        ...data.emprestimos.map(e => ({ tipo: 'emprestimo', id: e._id, descricao: 'Empréstimo' })),
+        ...data.despesas.map(d => ({ tipo: 'despesa', id: d._id, descricao: d.item || d.label, categoria: d.label, valor: d.valor_pendente || 0, devedor: d.devedor })),
+        ...data.emprestimos.map(e => ({ tipo: 'emprestimo', id: e._id, descricao: e.descricao || 'Empréstimo', valor: e.valor || 0, de: e.de, para: e.para })),
       ]
 
       const res = await fetch('/api/acerto', {
@@ -609,12 +609,29 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                           {a.de} pagou {a.para}
                         </p>
                         <p className="text-white/40 text-xs mt-1">{formatDateFull(a.data)}</p>
-                        <p className="text-white/60 text-xs mt-1">
-                          {a.itens_quitados?.length || 0} itens quitados
-                        </p>
                       </div>
                       <p className="text-mint-400 text-sm font-semibold">{fmt(a.valor)}</p>
                     </div>
+                    {a.itens_quitados?.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5">
+                        <p className="text-white/30 text-[10px] font-medium">{a.itens_quitados.length} itens quitados:</p>
+                        {a.itens_quitados.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${item.tipo === 'despesa' ? 'bg-amber-400' : 'bg-mint-400'}`} />
+                              <p className="text-white/50 text-[10px] truncate">
+                                {item.descricao || item.categoria || 'Item'}
+                                {item.devedor && <span className="text-white/30"> ({item.devedor} devia)</span>}
+                                {item.tipo === 'emprestimo' && item.de && <span className="text-white/30"> ({item.de} emprestou)</span>}
+                              </p>
+                            </div>
+                            {item.valor > 0 && (
+                              <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(item.valor)}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
