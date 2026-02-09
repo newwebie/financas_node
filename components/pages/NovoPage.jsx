@@ -146,6 +146,27 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
         showFeedback('Gasto registrado!')
         resetForm()
         triggerRefresh()
+
+        // Email de notificação para compras compartilhadas (fire-and-forget)
+        if (tipoCompra === 'Dividido (me deve metade)' || tipoCompra === 'Pra outra (me deve tudo)') {
+          try {
+            await fetch('/api/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tipo: 'notificacao_compra',
+                quemComprou: user,
+                item,
+                categoria,
+                valorTotal: parseFloat(preco) * quantidade,
+                tipoCompra,
+                descricao,
+              }),
+            })
+          } catch (e) {
+            // Silencioso - não bloqueia o fluxo
+          }
+        }
       } else {
         showFeedback('Erro ao salvar', true)
       }

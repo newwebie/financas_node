@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { enviarEmailAbastecimento, enviarLembreteEmprestimo } from '@/lib/email'
+import { enviarEmailAbastecimento, enviarLembreteEmprestimo, enviarEmailNotificacaoCompra } from '@/lib/email'
 
 export async function POST(request) {
   try {
@@ -21,6 +21,18 @@ export async function POST(request) {
         body.valor,
         body.descricao,
         body.dataDevolucao
+      )
+      return NextResponse.json({ success: sucesso })
+    }
+
+    if (body.tipo === 'notificacao_compra') {
+      const sucesso = await enviarEmailNotificacaoCompra(
+        body.quemComprou,
+        body.item,
+        body.categoria,
+        body.valorTotal,
+        body.tipoCompra,
+        body.descricao
       )
       return NextResponse.json({ success: sucesso })
     }
