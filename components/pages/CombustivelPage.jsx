@@ -163,7 +163,7 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
       <div className="grid grid-cols-2 gap-2 md:gap-4">
         {/* Moto */}
         {ultimoMoto ? (
-          <div className={`bg-gradient-to-br ${ultimoMoto.buyer === 'Susanna' ? coresSu.gradient : coresPi.gradient} bg-opacity-20 border border-white/10 rounded-2xl md:rounded-3xl p-3 md:p-5`}>
+          <div className={`border rounded-2xl md:rounded-3xl p-3 md:p-5 ${ultimoMoto.buyer === 'Susanna' ? 'bg-su-400/10 border-su-400/20' : 'bg-pi-400/10 border-pi-400/20'}`}>
             <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
               <Fuel size={14} className="text-white/60 md:hidden" />
               <Fuel size={20} className="text-white/60 hidden md:block" />
@@ -184,7 +184,7 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
 
         {/* Carro */}
         {ultimoCarro ? (
-          <div className={`bg-gradient-to-br ${ultimoCarro.buyer === 'Susanna' ? coresSu.gradient : coresPi.gradient} bg-opacity-20 border border-white/10 rounded-2xl md:rounded-3xl p-3 md:p-5`}>
+          <div className={`border rounded-2xl md:rounded-3xl p-3 md:p-5 ${ultimoCarro.buyer === 'Susanna' ? 'bg-su-400/10 border-su-400/20' : 'bg-pi-400/10 border-pi-400/20'}`}>
             <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
               <Fuel size={14} className="text-white/60 md:hidden" />
               <Fuel size={20} className="text-white/60 hidden md:block" />

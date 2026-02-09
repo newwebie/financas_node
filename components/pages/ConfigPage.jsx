@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/Cards'
-import { formatDateFull } from '@/lib/helpers'
+import { formatDateFull, getPeriodo } from '@/lib/helpers'
 import { Settings, Calendar, Check, Save } from 'lucide-react'
 
 export default function ConfigPage({ user, outro, colors, refreshKey, triggerRefresh }) {
@@ -12,6 +12,7 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
   const [dataFim, setDataFim] = useState('')
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
+  const [periodoReal, setPeriodoReal] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -22,6 +23,10 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
     try {
       const cfg = await fetch(`/api/config?user=${user}`).then(r => r.json())
       setConfig(cfg)
+
+      // Período real usado no app (custom ou calculado)
+      const pReal = getPeriodo(cfg, user, 0)
+      setPeriodoReal(pReal)
 
       // Buscar config de período atual
       const hoje = new Date()
@@ -103,9 +108,9 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
     )
   }
 
-  const periodoAtual = dataInicio && dataFim ? {
-    inicio: new Date(dataInicio + 'T00:00:00'),
-    fim: new Date(dataFim + 'T23:59:59')
+  const periodoAtual = periodoReal?.dataInicio && periodoReal?.dataFim ? {
+    inicio: periodoReal.dataInicio,
+    fim: periodoReal.dataFim
   } : null
 
   return (

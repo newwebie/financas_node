@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { fmt, formatDateFull, getCategoryDisplay, getPeriodo, CATEGORIAS } from '@/lib/helpers'
-import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, Target, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 export default function HomePage({ user, outro, colors, refreshKey, triggerRefresh, openEditItem, openAcerto }) {
@@ -23,6 +23,8 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
   const [showOutrosDetalhes, setShowOutrosDetalhes] = useState(false)
   const [expandedCategory, setExpandedCategory] = useState(null)
   const [situacao, setSituacao] = useState({ saldo: 0, dividasTerceiros: 0, emprestimosTerceiros: 0 })
+  const [metasInfo, setMetasInfo] = useState({ total: 0, noLimite: 0, excedidas: 0 })
+  const [scoreSaude, setScoreSaude] = useState(0)
   const [periodo, setPeriodo] = useState({ dataInicio: null, dataFim: null })
   const [recentTransactions, setRecentTransactions] = useState([])
 
@@ -33,13 +35,14 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
   async function loadData() {
     setLoading(true)
     try {
-      const [despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config] = await Promise.all([
+      const [despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config, metas] = await Promise.all([
         fetch(`/api/despesas?buyer=${user}`).then(r => r.json()),
         fetch('/api/contas-fixas').then(r => r.json()),
         fetch(`/api/emprestimos-terceiros?user=${user}`).then(r => r.json()),
         fetch(`/api/dividas-terceiros?user=${user}`).then(r => r.json()),
         fetch('/api/emprestimos').then(r => r.json()),
         fetch(`/api/config?user=${user}`).then(r => r.json()),
+        fetch(`/api/metas?user=${user}`).then(r => r.json()),
       ])
 
       // Usando periodo customizado se existir, senao calcula
@@ -50,6 +53,8 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       calcularStats(despesas, contasFixas, emprestimosTerceiros, periodoCalc)
       calcularCategorias(despesas, contasFixas, periodoCalc)
       calcularSituacao(despesas, emprestimos, dividasTerceiros, emprestimosTerceiros)
+      calcularMetas(metas, despesas, periodoCalc)
+      calcScore(despesas, contasFixas, metas, dividasTerceiros, config, periodoCalc)
       getRecentTransactions(despesas, periodoCalc)
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -204,6 +209,38 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     })
   }
 
+  function calcularMetas(metas, despesas, periodo) {
+    if (!metas || metas.length === 0) {
+      setMetasInfo({ total: 0, noLimite: 0, excedidas: 0 })
+      return
+    }
+
+    const despesasPeriodo = despesas.filter(d => {
+      const data = new Date(d.createdAt)
+      return data >= periodo.dataInicio && data <= periodo.dataFim
+    })
+
+    const gastosPorCategoria = {}
+    despesasPeriodo.forEach(d => {
+      let valor = d.total_value
+      if (d.installment > 1) valor = valor / d.installment
+      if (d.tem_pendencia && d.valor_pendente) valor -= d.valor_pendente
+      if (!gastosPorCategoria[d.label]) gastosPorCategoria[d.label] = 0
+      gastosPorCategoria[d.label] += valor
+    })
+
+    let noLimite = 0
+    let excedidas = 0
+    metas.forEach(meta => {
+      const gasto = gastosPorCategoria[meta.categoria] || 0
+      const percentual = (gasto / meta.limite) * 100
+      if (percentual >= 100) excedidas++
+      else noLimite++
+    })
+
+    setMetasInfo({ total: metas.length, noLimite, excedidas })
+  }
+
   function getRecentTransactions(despesas, periodo) {
     const despesasPeriodo = despesas
       .filter(d => {
@@ -214,6 +251,113 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       .slice(0, 5)
 
     setRecentTransactions(despesasPeriodo)
+  }
+
+  function calcScore(allDespesas, contasFixas, metasData, dividasTerceiros, config, periodoAtual) {
+    function getLimiteParaPeriodo(meta, periodoFim) {
+      if (!meta.historico_limites || meta.historico_limites.length === 0) return meta.limite
+      const entries = meta.historico_limites
+        .filter(h => new Date(h.desde) <= periodoFim)
+        .sort((a, b) => new Date(b.desde) - new Date(a.desde))
+      return entries.length > 0 ? entries[0].limite : meta.limite
+    }
+
+    const filtrar = (periodo) => allDespesas.filter(d => {
+      const dt = new Date(d.createdAt)
+      return dt >= periodo.dataInicio && dt <= periodo.dataFim && d.label !== 'Cofrinho' && d.label !== 'Renda Variavel'
+    })
+
+    const calcTotal = (desps) => desps.reduce((sum, d) => {
+      let v = d.total_value
+      if (d.installment > 1) v = v / d.installment
+      if (d.tem_pendencia && d.valor_pendente) v -= d.valor_pendente
+      return sum + v
+    }, 0)
+
+    const periodoAnterior = getPeriodo(config, user, 1)
+    const despAtual = filtrar(periodoAtual)
+    const totalAtual = calcTotal(despAtual)
+    const totalAnterior = calcTotal(filtrar(periodoAnterior))
+
+    // Cofrinho no período
+    const totalCofrinho = allDespesas.filter(d => {
+      const dt = new Date(d.createdAt)
+      return dt >= periodoAtual.dataInicio && dt <= periodoAtual.dataFim && d.label === 'Cofrinho'
+    }).reduce((sum, d) => sum + d.total_value, 0)
+    const metaCofrinho = metasData.find(m => m.categoria === 'Cofrinho')
+
+    // Gastos por categoria (incluindo contas fixas, igual RelatorioPage)
+    const gastosPorCat = {}
+    despAtual.forEach(d => {
+      let v = d.total_value
+      if (d.installment > 1) v = v / d.installment
+      if (d.tem_pendencia && d.valor_pendente) v -= d.valor_pendente
+      gastosPorCat[d.label] = (gastosPorCat[d.label] || 0) + v
+    })
+    const fixasUser = contasFixas.filter(c => c.buyer === user || c.responsavel === user)
+    const catIds = new Set(CATEGORIAS.map(c => c.id))
+    fixasUser.forEach(c => {
+      const rawCat = c.categoria || 'Contas'
+      const cat = catIds.has(rawCat) ? rawCat : 'Contas'
+      gastosPorCat[cat] = (gastosPorCat[cat] || 0) + (c.valor || 0)
+    })
+
+    // Metas com gasto
+    const metasComGasto = metasData.map(m => {
+      const gasto = m.categoria === 'Cofrinho' ? totalCofrinho : (gastosPorCat[m.categoria] || 0)
+      const limite = getLimiteParaPeriodo(m, periodoAtual.dataFim)
+      return { percent: limite > 0 ? (gasto / limite) * 100 : 0, isCofrinho: m.categoria === 'Cofrinho' }
+    })
+
+    // Compromisso total (parcelas ativas)
+    const refDate = periodoAtual.dataInicio
+    const compromissoTotal = allDespesas.filter(d => {
+      if (d.installment <= 1 || d.payment_method !== 'Credito') return false
+      const dc = new Date(d.createdAt)
+      const meses = (refDate.getFullYear() - dc.getFullYear()) * 12 + (refDate.getMonth() - dc.getMonth())
+      return meses < d.installment
+    }).reduce((sum, d) => sum + d.total_value, 0)
+
+    const dividasAbertas = dividasTerceiros.filter(d => d.status === 'em aberto')
+
+    let score = 0
+
+    // 1. Economia (0-25) - meta de Cofrinho
+    const limCofrinho = metaCofrinho ? getLimiteParaPeriodo(metaCofrinho, periodoAtual.dataFim) : 0
+    if (metaCofrinho && limCofrinho > 0) {
+      score += Math.min(25, Math.round((totalCofrinho / limCofrinho) * 25))
+    } else {
+      score += 12
+    }
+
+    // 2. Metas (0-25)
+    if (metasComGasto.length > 0) {
+      const dentro = metasComGasto.filter(m => m.isCofrinho ? m.percent >= 100 : m.percent <= 100).length
+      score += Math.round((dentro / metasComGasto.length) * 25)
+    } else {
+      score += 12
+    }
+
+    // 3. Tendência (0-25)
+    if (totalAnterior > 0) {
+      if (totalAtual <= totalAnterior * 0.8) score += 25
+      else if (totalAtual <= totalAnterior * 0.95) score += 20
+      else if (totalAtual <= totalAnterior * 1.05) score += 15
+      else if (totalAtual <= totalAnterior * 1.2) score += 8
+      else score += 3
+    } else {
+      score += 12
+    }
+
+    // 4. Controle (0-25)
+    let ctrl = 25
+    if (compromissoTotal > totalAtual * 0.5) ctrl -= 10
+    else if (compromissoTotal > totalAtual * 0.3) ctrl -= 5
+    if (dividasAbertas.length > 3) ctrl -= 10
+    else if (dividasAbertas.length > 0) ctrl -= 5
+    score += Math.max(0, ctrl)
+
+    setScoreSaude(Math.min(100, Math.max(0, score)))
   }
 
   const CustomTooltip = ({ active, payload }) => {
@@ -245,8 +389,12 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     )
   }
 
-  const economia = stats.cofrinho + stats.extra
-  const economiaPercent = stats.total > 0 ? (economia / stats.total) * 100 : 0
+  // Score helpers (matching RelatorioPage)
+  const scoreLabel = scoreSaude >= 80 ? 'Excelente' : scoreSaude >= 60 ? 'Bom' : scoreSaude >= 40 ? 'Atenção' : 'Crítico'
+  const scoreColor = scoreSaude >= 80 ? 'text-mint-400' : scoreSaude >= 60 ? 'text-emerald-400' : scoreSaude >= 40 ? 'text-amber-400' : 'text-coral-400'
+  const ringColor = scoreSaude >= 80 ? '#6ee7b7' : scoreSaude >= 60 ? '#34d399' : scoreSaude >= 40 ? '#fbbf24' : '#f87171'
+  const circumference = 2 * Math.PI * 34
+  const strokeDashoffset = circumference - (circumference * scoreSaude) / 100
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -264,7 +412,16 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       <div className={`relative overflow-hidden bg-gradient-to-br ${colors.gradient} rounded-2xl md:rounded-3xl p-4 md:p-6 border border-white/10`}>
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
         <div className="relative">
-          <p className="text-white/70 text-[10px] md:text-sm font-medium mb-1">Total de Gastos</p>
+          <div className="flex items-start justify-between">
+            <p className="text-white/70 text-[10px] md:text-sm font-medium mb-1">Total de Gastos</p>
+            {/* Mini-stats */}
+            <div className="flex items-center gap-1.5">
+              <Target size={12} className="text-white/50" />
+              <span className={`text-[10px] md:text-xs font-medium ${metasInfo.excedidas > 0 ? 'text-red-300' : 'text-white/70'}`}>
+                {metasInfo.total === 0 ? 'N/A' : `${metasInfo.noLimite}/${metasInfo.total}`}
+              </span>
+            </div>
+          </div>
           <p className="text-white text-3xl md:text-5xl font-bold tracking-tight">{fmt(stats.gastos)}</p>
         </div>
       </div>
@@ -301,19 +458,28 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
           <p className="text-white text-base md:text-2xl font-bold">{fmt(stats.extra)}</p>
         </div>
 
-        {/* Taxa de Economia */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 hover:border-lavender-400/30 transition-all">
-          <div className="flex items-center justify-between mb-2 md:mb-4">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-lavender-500/20 flex items-center justify-center">
-              <TrendingUp size={16} className="text-lavender-400 md:hidden" />
-              <TrendingUp size={20} className="text-lavender-400 hidden md:block" />
+        {/* Saúde Financeira */}
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 transition-all flex items-center justify-center">
+          <div className="relative">
+            <svg className="w-[90px] h-[90px] md:w-[120px] md:h-[120px]" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
+              <circle
+                cx="40" cy="40" r="34"
+                fill="none"
+                stroke={ringColor}
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                transform="rotate(-90 40 40)"
+                style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 0.5s ease' }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-xl md:text-3xl font-bold text-white">{scoreSaude}</span>
+              <span className={`text-[8px] md:text-[10px] font-medium ${scoreColor}`}>{scoreLabel}</span>
             </div>
-            <span className="text-lavender-400 text-[10px] md:text-xs font-medium px-1.5 py-0.5 md:px-2 md:py-1 bg-lavender-500/10 rounded-lg">
-              {economiaPercent.toFixed(1)}%
-            </span>
           </div>
-          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1">Total Economizado</p>
-          <p className="text-white text-base md:text-2xl font-bold">{fmt(economia)}</p>
         </div>
       </div>
 

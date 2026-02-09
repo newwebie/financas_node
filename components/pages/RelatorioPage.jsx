@@ -530,8 +530,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       {metricas.comparacaoCategorias?.length > 0 && (
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
           <div className="flex items-center gap-2 mb-4">
-            <ShoppingBag size={16} className="text-white/40 flex-shrink-0" />
-            <span className="text-sm font-medium text-white/50">Comparação Mensal</span>
+            <span className="text-sm font-medium text-white/50">📈 vs Mês Anterior</span>
           </div>
           <div className="space-y-3">
             {metricas.comparacaoCategorias.map(c => {

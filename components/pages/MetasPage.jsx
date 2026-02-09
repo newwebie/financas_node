@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ProgressBar, SectionTitle, Skeleton, Badge } from '@/components/ui/Cards'
-import { fmt, getCategoryDisplay, calcPeriodoFatura, CATEGORIES } from '@/lib/helpers'
+import { fmt, getCategoryDisplay, getPeriodo, CATEGORIES } from '@/lib/helpers'
 import { ChevronDown, Plus, Target, TriangleAlert, Check } from 'lucide-react'
 
 export default function MetasPage({ user, outro, colors, refreshKey, triggerRefresh }) {
@@ -32,8 +32,8 @@ export default function MetasPage({ user, outro, colors, refreshKey, triggerRefr
 
       setMetas(metasData)
 
-      // Calcular gastos por categoria no período (usando mesesAtras = 1 para fatura anterior)
-      const periodo = calcPeriodoFatura(config, user, 1)
+      // Calcular gastos por categoria no período da fatura atual
+      const periodo = getPeriodo(config, user, 0)
       const despesasPeriodo = despesas.filter(d => {
         const data = new Date(d.createdAt)
         return data >= periodo.dataInicio && data <= periodo.dataFim && d.buyer === user
