@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { fmt, formatDateFull, getCategoryDisplay, getPeriodo, CATEGORIAS } from '@/lib/helpers'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, ChevronDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 export default function HomePage({ user, outro, colors, refreshKey, triggerRefresh, openEditItem, openAcerto }) {
@@ -59,9 +59,10 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
   }
 
   function calcularStats(despesas, contasFixas, emprestimosTerceiros, periodo) {
-    let gastos = 0
     let cofrinho = 0
     let extra = 0
+    let despesasTotal = 0
+    let emprestimosTotal = 0
 
     const despesasPeriodo = despesas.filter(d => {
       const data = new Date(d.createdAt)
@@ -78,13 +79,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       } else if (d.label === 'Renda Variavel') {
         extra += valor
       } else {
-        gastos += valor
-      }
-    })
-
-    contasFixas.forEach(c => {
-      if (c.buyer === user || c.responsavel === user) {
-        gastos += c.valor || 0
+        despesasTotal += valor
       }
     })
 
@@ -92,11 +87,12 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       if (e.status === 'em aberto') {
         const dataEmprestimo = new Date(e.data_emprestimo)
         if (dataEmprestimo >= periodo.dataInicio && dataEmprestimo <= periodo.dataFim) {
-          gastos += e.valor
+          emprestimosTotal += e.valor
         }
       }
     })
 
+    const gastos = despesasTotal + emprestimosTotal
     const total = gastos + cofrinho + extra
     setStats({ gastos, cofrinho, extra, total })
   }
@@ -131,26 +127,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       })
     })
 
-    // Incluir contas fixas nas categorias
-    const catIds = new Set(CATEGORIAS.map(c => c.id))
-    contasFixas.forEach(c => {
-      if (c.buyer === user || c.responsavel === user) {
-        const rawCat = c.categoria || 'Contas'
-        const cat = catIds.has(rawCat) ? rawCat : 'Contas'
-        if (!catMap[cat]) {
-          catMap[cat] = 0
-          catItens[cat] = []
-        }
-        catMap[cat] += c.valor || 0
-        catItens[cat].push({
-          item: c.nome || c.descricao || 'Conta Fixa',
-          valor: c.valor || 0,
-          data: null,
-          description: c.observacao || 'Conta fixa mensal',
-          payment_method: c.cartao_credito ? 'Credito' : 'Debito'
-        })
-      }
-    })
+    // Contas fixas removidas do total de gastos e categorias
 
     const categoriasList = Object.entries(catMap)
       .map(([cat, valor]) => ({ categoria: cat, valor }))
@@ -286,15 +263,9 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       {/* Hero Card - Total de Gastos */}
       <div className={`relative overflow-hidden bg-gradient-to-br ${colors.gradient} rounded-2xl md:rounded-3xl p-4 md:p-6 border border-white/10`}>
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <p className="text-white/70 text-[10px] md:text-sm font-medium mb-1">Total de Gastos</p>
-            <p className="text-white text-3xl md:text-5xl font-bold tracking-tight">{fmt(stats.gastos)}</p>
-          </div>
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-            <Wallet size={20} className="text-white md:hidden" />
-            <Wallet size={24} className="text-white hidden md:block" />
-          </div>
+        <div className="relative">
+          <p className="text-white/70 text-[10px] md:text-sm font-medium mb-1">Total de Gastos</p>
+          <p className="text-white text-3xl md:text-5xl font-bold tracking-tight">{fmt(stats.gastos)}</p>
         </div>
       </div>
 
