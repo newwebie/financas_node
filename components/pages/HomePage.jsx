@@ -234,8 +234,9 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     metas.forEach(meta => {
       const gasto = gastosPorCategoria[meta.categoria] || 0
       const percentual = (gasto / meta.limite) * 100
-      if (percentual >= 100) excedidas++
-      else noLimite++
+      const isCofrinho = meta.categoria === 'Cofrinho'
+      if (isCofrinho ? percentual >= 100 : percentual <= 100) noLimite++
+      else excedidas++
     })
 
     setMetasInfo({ total: metas.length, noLimite, excedidas })
