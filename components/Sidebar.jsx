@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { formatDateFull } from '@/lib/helpers'
 import {
   Home, Plus, Handshake, BarChart3, Fuel, Target,
@@ -12,26 +11,15 @@ const ICON_MAP = {
   Users, Pencil, Settings,
 }
 
-export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggle, user, colors, onSwitchUser, perfilConfig, periodo }) {
+export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggle, user, colors, onSwitchUser, periodo }) {
   const isSu = user === 'Susanna'
-  const perfil = perfilConfig?.[user] || { tipo: 'emoji', valor: isSu ? '⚡' : '👤' }
+  const emoji = isSu ? '⚡' : '🔱'
 
-  function renderAvatar(size = 40) {
-    if (perfil.tipo === 'emoji') {
-      return (
-        <div className={`w-full h-full bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
-          <span className="text-sm">{perfil.valor}</span>
-        </div>
-      )
-    }
+  function renderAvatar() {
     return (
-      <Image
-        src={perfil.valor}
-        alt={user}
-        width={size}
-        height={size}
-        className="object-cover w-full h-full"
-      />
+      <div className={`w-full h-full bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
+        <span className="text-sm">{emoji}</span>
+      </div>
     )
   }
 
@@ -48,7 +36,7 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
                       shadow-lg hover:scale-105 transition-transform active:scale-95`}
           title={`Trocar (${user})`}
         >
-          {renderAvatar(40)}
+          {renderAvatar()}
         </button>
         {periodo?.dataInicio && (
           <div className="mb-3 flex flex-col items-center" title="Período da Fatura">
@@ -88,7 +76,7 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
         <div className="p-4 flex items-center justify-between border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-2xl overflow-hidden shadow-lg ${isSu ? 'ring-2 ring-su-400/30' : 'ring-2 ring-pi-400/30'}`}>
-              {renderAvatar(40)}
+              {renderAvatar()}
             </div>
             <div>
               <p className="text-white font-semibold text-sm">{user}</p>

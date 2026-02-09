@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { getUserColors, getOtherUser, calcPeriodoFatura } from '@/lib/helpers'
+import { getUserColors, getOtherUser, getPeriodo } from '@/lib/helpers'
 import Sidebar from '@/components/Sidebar'
 import HomePage from '@/components/pages/HomePage'
 import NovoPage from '@/components/pages/NovoPage'
@@ -33,48 +33,18 @@ export default function AppShell({ user, onSwitchUser }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [editItemId, setEditItemId] = useState(null)
   const [acertoFocus, setAcertoFocus] = useState(null)
-  const [perfilConfig, setPerfilConfig] = useState({ Susanna: null, Pietrah: null })
   const [periodo, setPeriodo] = useState({ dataInicio: null, dataFim: null })
   const colors = getUserColors(user)
   const outro = getOtherUser(user)
 
   useEffect(() => {
-    loadPerfilConfig()
-  }, [refreshKey])
-
-  useEffect(() => {
     loadPeriodo()
   }, [user, refreshKey])
-
-
-  async function loadPerfilConfig() {
-    try {
-      const [cfgSu, cfgPi] = await Promise.all([
-        fetch('/api/config?user=Susanna').then(r => r.json()),
-        fetch('/api/config?user=Pietrah').then(r => r.json()),
-      ])
-
-      const perfilSu = cfgSu.find(c => c.tipo === 'perfil' && c.user === 'Susanna')
-      const perfilPi = cfgPi.find(c => c.tipo === 'perfil' && c.user === 'Pietrah')
-
-      setPerfilConfig({
-        Susanna: perfilSu ? { tipo: perfilSu.perfil_tipo, valor: perfilSu.perfil_valor } : { tipo: 'emoji', valor: '⚡' },
-        Pietrah: perfilPi ? { tipo: perfilPi.perfil_tipo, valor: perfilPi.perfil_valor } : { tipo: 'foto', valor: '/avatars/pietrah.png' },
-      })
-    } catch (error) {
-      console.error('Erro ao carregar perfis:', error)
-      // Usar padrões em caso de erro
-      setPerfilConfig({
-        Susanna: { tipo: 'emoji', valor: '⚡' },
-        Pietrah: { tipo: 'foto', valor: '/avatars/pietrah.png' },
-      })
-    }
-  }
 
   async function loadPeriodo() {
     try {
       const config = await fetch(`/api/config?user=${user}`).then(r => r.json())
-      const p = calcPeriodoFatura(config, user, 1)
+      const p = getPeriodo(config, user, 0)
       setPeriodo(p)
     } catch (error) {
       console.error('Erro ao carregar período:', error)
@@ -136,7 +106,7 @@ export default function AppShell({ user, onSwitchUser }) {
       <Sidebar pages={PAGES} activePage={activePage} onNavigate={handleNavigate}
                isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)}
                user={user} colors={colors} onSwitchUser={onSwitchUser}
-               perfilConfig={perfilConfig} periodo={periodo} />
+               periodo={periodo} />
       <main className="flex-1 min-h-screen lg:ml-[72px] relative z-10">
         <div className="sticky top-0 z-30 bg-base-900/80 backdrop-blur-md border-b border-white/5
                         px-4 py-3 flex items-center justify-between lg:hidden">

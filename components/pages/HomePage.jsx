@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { fmt, formatDateFull, getCategoryDisplay, calcPeriodoFatura, CATEGORIAS } from '@/lib/helpers'
+import { fmt, formatDateFull, getCategoryDisplay, getPeriodo, CATEGORIAS } from '@/lib/helpers'
 import { TrendingUp, TrendingDown, Wallet, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -42,8 +42,8 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         fetch(`/api/config?user=${user}`).then(r => r.json()),
       ])
 
-      // Usando mesesAtras = 1 para exibir fatura anterior
-      const periodoCalc = calcPeriodoFatura(config, user, 1)
+      // Usando periodo customizado se existir, senao calcula
+      const periodoCalc = getPeriodo(config, user, 0)
       setPeriodo(periodoCalc)
 
       setData({ despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config })
@@ -132,9 +132,11 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     })
 
     // Incluir contas fixas nas categorias
+    const catIds = new Set(CATEGORIAS.map(c => c.id))
     contasFixas.forEach(c => {
       if (c.buyer === user || c.responsavel === user) {
-        const cat = c.categoria || 'Outros'
+        const rawCat = c.categoria || 'Contas'
+        const cat = catIds.has(rawCat) ? rawCat : 'Contas'
         if (!catMap[cat]) {
           catMap[cat] = 0
           catItens[cat] = []

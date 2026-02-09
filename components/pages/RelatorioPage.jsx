@@ -137,8 +137,10 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       gastosPorCategoria[d.label] = (gastosPorCategoria[d.label] || 0) + valor
     })
     // Incluir contas fixas nas categorias (são mensais, entram em todo período)
+    const catIds = new Set(CATEGORIAS.map(c => c.id))
     fixas.forEach(c => {
-      const cat = c.categoria || 'Outros'
+      const rawCat = c.categoria || 'Contas'
+      const cat = catIds.has(rawCat) ? rawCat : 'Contas'
       gastosPorCategoria[cat] = (gastosPorCategoria[cat] || 0) + (c.valor || 0)
     })
 
@@ -152,7 +154,8 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     })
     // Contas fixas também no período anterior (são recorrentes)
     fixas.forEach(c => {
-      const cat = c.categoria || 'Outros'
+      const rawCat = c.categoria || 'Contas'
+      const cat = catIds.has(rawCat) ? rawCat : 'Contas'
       gastosPorCategoriaAnterior[cat] = (gastosPorCategoriaAnterior[cat] || 0) + (c.valor || 0)
     })
 

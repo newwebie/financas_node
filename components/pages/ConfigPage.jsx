@@ -3,14 +3,11 @@
 import { useState, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/Cards'
 import { formatDateFull } from '@/lib/helpers'
-import { Settings, Calendar, Check, Save, User, Image as ImageIcon } from 'lucide-react'
-
-const EMOJIS_DISPONIVEIS = ['⚡', '🌟', '💫', '🔥', '💎', '🌸', '🦋', '🌺', '🎨', '🎭', '🎪', '🎯']
+import { Settings, Calendar, Check, Save } from 'lucide-react'
 
 export default function ConfigPage({ user, outro, colors, refreshKey, triggerRefresh }) {
   const [loading, setLoading] = useState(true)
   const [config, setConfig] = useState([])
-  const [perfilConfig, setPerfilConfig] = useState({ tipo: 'emoji', valor: '⚡' })
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [saving, setSaving] = useState(false)
@@ -25,15 +22,6 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
     try {
       const cfg = await fetch(`/api/config?user=${user}`).then(r => r.json())
       setConfig(cfg)
-
-      // Buscar config de perfil
-      const perfilCfg = cfg.find(c => c.tipo === 'perfil' && c.user === user)
-      if (perfilCfg) {
-        setPerfilConfig({
-          tipo: perfilCfg.perfil_tipo || 'emoji',
-          valor: perfilCfg.perfil_valor || '⚡'
-        })
-      }
 
       // Buscar config de período atual
       const hoje = new Date()
@@ -56,31 +44,6 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
       console.error('Erro ao carregar configurações:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleSavePerfil() {
-    setSaving(true)
-    try {
-      await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user,
-          tipo: 'perfil',
-          perfil_tipo: perfilConfig.tipo,
-          perfil_valor: perfilConfig.valor,
-        }),
-      })
-
-      showToast('Perfil atualizado com sucesso!')
-      await loadData()
-      triggerRefresh()
-    } catch (error) {
-      console.error('Erro ao salvar perfil:', error)
-      showToast('Erro ao salvar perfil')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -152,103 +115,6 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
         <div>
           <h1 className="text-2xl font-semibold text-white">Configurações</h1>
           <p className="text-white/40 text-sm">Personalize sua experiência</p>
-        </div>
-      </div>
-
-      {/* Configuração de Perfil */}
-      <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <User size={20} className="text-white/60" />
-          <h2 className="text-white font-semibold text-lg">Foto/Emoji de Perfil</h2>
-        </div>
-
-        {/* Preview */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className={`w-16 h-16 rounded-2xl overflow-hidden shadow-lg ${user === 'Susanna' ? 'ring-2 ring-su-400/30' : 'ring-2 ring-pi-400/30'}`}>
-            {perfilConfig.tipo === 'emoji' ? (
-              <div className={`w-full h-full bg-gradient-to-br ${colors.gradient} flex items-center justify-center text-2xl`}>
-                {perfilConfig.valor}
-              </div>
-            ) : (
-              <img src={perfilConfig.valor} alt="Perfil" className="w-full h-full object-cover" />
-            )}
-          </div>
-          <div>
-            <p className="text-white font-medium">{user}</p>
-            <p className="text-white/40 text-xs">Preview do seu perfil</p>
-          </div>
-        </div>
-
-        {/* Tipo de Perfil */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-white/60 text-sm mb-2">Tipo</label>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPerfilConfig({ ...perfilConfig, tipo: 'emoji' })}
-                className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all
-                            ${perfilConfig.tipo === 'emoji'
-                              ? `bg-gradient-to-br ${colors.gradient} text-white`
-                              : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
-              >
-                Emoji
-              </button>
-              <button
-                onClick={() => setPerfilConfig({ ...perfilConfig, tipo: 'foto' })}
-                className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all
-                            ${perfilConfig.tipo === 'foto'
-                              ? `bg-gradient-to-br ${colors.gradient} text-white`
-                              : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
-              >
-                Foto
-              </button>
-            </div>
-          </div>
-
-          {perfilConfig.tipo === 'emoji' ? (
-            <div>
-              <label className="block text-white/60 text-sm mb-2">Escolha um emoji</label>
-              <div className="grid grid-cols-6 gap-2">
-                {EMOJIS_DISPONIVEIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => setPerfilConfig({ ...perfilConfig, valor: emoji })}
-                    className={`w-full aspect-square rounded-xl flex items-center justify-center text-2xl transition-all
-                                ${perfilConfig.valor === emoji
-                                  ? `bg-gradient-to-br ${colors.gradient} scale-110`
-                                  : 'bg-white/5 hover:bg-white/10'}`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <label className="block text-white/60 text-sm mb-2">URL da Foto</label>
-              <input
-                type="text"
-                value={perfilConfig.valor}
-                onChange={(e) => setPerfilConfig({ ...perfilConfig, valor: e.target.value })}
-                placeholder="/avatars/pietrah.png"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white/20"
-              />
-              <p className="text-white/30 text-xs mt-2">
-                Coloque a foto em /public/avatars/ e use o caminho /avatars/nome.png
-              </p>
-            </div>
-          )}
-
-          <button
-            onClick={handleSavePerfil}
-            disabled={saving}
-            className={`w-full bg-gradient-to-br ${colors.gradient} text-white rounded-xl py-3 px-4
-                        flex items-center justify-center gap-2 font-medium
-                        hover:opacity-90 transition-opacity disabled:opacity-50`}
-          >
-            <Save size={16} />
-            {saving ? 'Salvando...' : 'Salvar Perfil'}
-          </button>
         </div>
       </div>
 

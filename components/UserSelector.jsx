@@ -1,68 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Image from 'next/image'
 
+const EMOJIS = { Susanna: '⚡', Pietrah: '🔱' }
+
 export default function UserSelector({ onSelect }) {
-  const [perfis, setPerfis] = useState({ Susanna: null, Pietrah: null })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadPerfis()
-  }, [])
-
-  async function loadPerfis() {
-    try {
-      const [cfgSu, cfgPi] = await Promise.all([
-        fetch('/api/config?user=Susanna').then(r => r.json()),
-        fetch('/api/config?user=Pietrah').then(r => r.json()),
-      ])
-
-      const perfilSu = cfgSu.find(c => c.tipo === 'perfil' && c.user === 'Susanna')
-      const perfilPi = cfgPi.find(c => c.tipo === 'perfil' && c.user === 'Pietrah')
-
-      setPerfis({
-        Susanna: perfilSu ? { tipo: perfilSu.perfil_tipo, valor: perfilSu.perfil_valor } : { tipo: 'emoji', valor: '⚡' },
-        Pietrah: perfilPi ? { tipo: perfilPi.perfil_tipo, valor: perfilPi.perfil_valor } : { tipo: 'emoji', valor: '🔱' },
-      })
-    } catch (error) {
-      console.error('Erro ao carregar perfis:', error)
-      // Usar padrões em caso de erro
-      setPerfis({
-        Susanna: { tipo: 'emoji', valor: '⚡' },
-        Pietrah: { tipo: 'emoji', valor: '🔱' },
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function renderAvatar(user, perfil) {
-    if (perfil.tipo === 'emoji') {
-      return (
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg
-                        bg-gradient-to-br from-gray-500/15 to-gray-700/15 shadow-gray-500/5">
-          <span className="text-xl">{perfil.valor}</span>
-        </div>
-      )
-    }
+  function renderAvatar(user) {
     return (
-      <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg ring-2 shadow-gray-500/10 ring-white/20">
-        <Image
-          src={perfil.valor}
-          alt={user}
-          width={48}
-          height={48}
-          className="object-cover w-full h-full"
-        />
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-base-900 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg
+                      bg-gradient-to-br from-gray-500/15 to-gray-700/15 shadow-gray-500/5">
+        <span className="text-xl">{EMOJIS[user]}</span>
       </div>
     )
   }
@@ -110,7 +57,7 @@ export default function UserSelector({ onSelect }) {
           <div className="absolute inset-0 rounded-3xl bg-white/[0.02]
                           opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           <div className="relative flex items-center gap-4">
-            {renderAvatar('Susanna', perfis.Susanna)}
+            {renderAvatar('Susanna')}
             <p className="text-white font-semibold text-lg">Susanna</p>
           </div>
         </button>
@@ -124,7 +71,7 @@ export default function UserSelector({ onSelect }) {
           <div className="absolute inset-0 rounded-3xl bg-white/[0.02]
                           opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           <div className="relative flex items-center gap-4">
-            {renderAvatar('Pietrah', perfis.Pietrah)}
+            {renderAvatar('Pietrah')}
             <p className="text-white font-semibold text-lg">Pietrah</p>
           </div>
         </button>
