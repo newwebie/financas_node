@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { fmt, formatDateFull, getCategoryDisplay, getPeriodo, CATEGORIAS } from '@/lib/helpers'
-import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, Target, ChevronDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, Target, ChevronDown, HeartPulse } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 export default function HomePage({ user, outro, colors, refreshKey, triggerRefresh, openEditItem, openAcerto }) {
@@ -394,6 +394,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
   const scoreLabel = scoreSaude >= 80 ? 'Excelente' : scoreSaude >= 60 ? 'Bom' : scoreSaude >= 40 ? 'Atenção' : 'Crítico'
   const scoreColor = scoreSaude >= 80 ? 'text-mint-400' : scoreSaude >= 60 ? 'text-emerald-400' : scoreSaude >= 40 ? 'text-amber-400' : 'text-coral-400'
   const ringColor = scoreSaude >= 80 ? '#6ee7b7' : scoreSaude >= 60 ? '#34d399' : scoreSaude >= 40 ? '#fbbf24' : '#f87171'
+  const scoreBg = scoreSaude >= 80 ? 'bg-mint-500/20' : scoreSaude >= 60 ? 'bg-emerald-500/20' : scoreSaude >= 40 ? 'bg-amber-500/20' : 'bg-coral-500/20'
   const circumference = 2 * Math.PI * 34
   const strokeDashoffset = circumference - (circumference * scoreSaude) / 100
 
@@ -460,27 +461,31 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         </div>
 
         {/* Saúde Financeira */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 transition-all flex items-center justify-center">
-          <div className="relative">
-            <svg className="w-[90px] h-[90px] md:w-[120px] md:h-[120px]" viewBox="0 0 80 80">
-              <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
-              <circle
-                cx="40" cy="40" r="34"
-                fill="none"
-                stroke={ringColor}
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                transform="rotate(-90 40 40)"
-                style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 0.5s ease' }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-xl md:text-3xl font-bold text-white">{scoreSaude}</span>
-              <span className={`text-[8px] md:text-[10px] font-medium ${scoreColor}`}>{scoreLabel}</span>
-            </div>
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 transition-all relative flex items-center justify-center">
+          <div className={`absolute top-2 left-2 md:top-3 md:left-3 w-5 h-5 md:w-6 md:h-6 rounded-md ${scoreBg} flex items-center justify-center`}>
+            <HeartPulse size={10} className={`${scoreColor} md:hidden`} />
+            <HeartPulse size={12} className={`${scoreColor} hidden md:block`} />
           </div>
+          <div className="relative">
+            <svg className="w-[80px] h-[80px] md:w-[110px] md:h-[110px]" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
+                <circle
+                  cx="40" cy="40" r="34"
+                  fill="none"
+                  stroke={ringColor}
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  transform="rotate(-90 40 40)"
+                  style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 0.5s ease' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-xl md:text-3xl font-bold text-white">{scoreSaude}</span>
+                <span className={`text-[8px] md:text-[10px] font-medium ${scoreColor}`}>{scoreLabel}</span>
+              </div>
+            </div>
         </div>
       </div>
 
