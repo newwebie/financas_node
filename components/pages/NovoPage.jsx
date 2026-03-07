@@ -30,11 +30,13 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
   const [valorMoto, setValorMoto] = useState('30.00')
   const [pagamentoMoto, setPagamentoMoto] = useState('Debito')
   const [dataMoto, setDataMoto] = useState(getLocalDate())
+  const [usoPessoalMoto, setUsoPessoalMoto] = useState(false)
 
   // Form Abastecimento Carro
   const [valorCarro, setValorCarro] = useState('60.00')
   const [pagamentoCarro, setPagamentoCarro] = useState('Debito')
   const [dataCarro, setDataCarro] = useState(getLocalDate())
+  const [usoPessoalCarro, setUsoPessoalCarro] = useState(false)
 
   // Form Gasto
   const [categoria, setCategoria] = useState('Comida')
@@ -295,6 +297,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
           createdAt: dataMoto,
           pagamento_compartilhado: 'Pra mim',
           tem_pendencia: false,
+          uso_pessoal: usoPessoalMoto,
         }),
       })
 
@@ -321,6 +324,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
 
         showFeedback(emailEnviado ? 'Registrado! Email enviado' : 'Abastecimento Moto registrado!')
         setValorMoto('30.00')
+        setUsoPessoalMoto(false)
         setExpandMoto(false)
         triggerRefresh()
       } else {
@@ -353,6 +357,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
           createdAt: dataCarro,
           pagamento_compartilhado: 'Pra mim',
           tem_pendencia: false,
+          uso_pessoal: usoPessoalCarro,
         }),
       })
 
@@ -379,6 +384,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
 
         showFeedback(emailEnviado ? 'Registrado! Email enviado' : 'Abastecimento Carro registrado!')
         setValorCarro('100.00')
+        setUsoPessoalCarro(false)
         setExpandCarro(false)
         triggerRefresh()
       } else {
@@ -494,6 +500,16 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
               />
             </div>
 
+            <label className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-base-800 border border-white/10 cursor-pointer hover:bg-white/5">
+              <input
+                type="checkbox"
+                checked={usoPessoalMoto}
+                onChange={(e) => setUsoPessoalMoto(e.target.checked)}
+                className="w-5 h-5 rounded accent-amber-500"
+              />
+              <span className="text-white text-sm">Uso pessoal</span>
+            </label>
+
             <button
               onClick={handleAbastecimentoMoto}
               disabled={loading}
@@ -542,6 +558,16 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
                 className="w-full px-4 py-3 rounded-2xl bg-base-800 border border-white/10 text-white focus:border-white/20 outline-none"
               />
             </div>
+
+            <label className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-base-800 border border-white/10 cursor-pointer hover:bg-white/5">
+              <input
+                type="checkbox"
+                checked={usoPessoalCarro}
+                onChange={(e) => setUsoPessoalCarro(e.target.checked)}
+                className="w-5 h-5 rounded accent-sky-500"
+              />
+              <span className="text-white text-sm">Uso pessoal</span>
+            </label>
 
             <button
               onClick={handleAbastecimentoCarro}

@@ -35,6 +35,7 @@ export async function POST(request) {
       devedor: body.devedor || null,
       valor_pendente: body.valor_pendente || null,
       status_pendencia: body.status_pendencia || null,
+      uso_pessoal: body.uso_pessoal || false,
     }
     const result = await colls.despesas.insertOne(doc)
     if (doc.tem_pendencia && doc.devedor) {

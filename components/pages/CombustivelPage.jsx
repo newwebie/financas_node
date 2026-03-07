@@ -25,7 +25,7 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
       const despesas = await fetch('/api/despesas').then(r => r.json())
 
       // Filtrar apenas despesas de combustível
-      const combustivel = despesas.filter(d => d.label === 'Combustivel')
+      const combustivel = despesas.filter(d => d.label === 'Combustivel' && !d.uso_pessoal)
 
       // Separar por veículo
       const moto = combustivel.filter(d => d.item === 'Moto').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
