@@ -82,7 +82,7 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       })
 
       // Contas fixas
-      contasFixas.filter(c => c.buyer === user).forEach(c => {
+      contasFixas.filter(c => c.buyer === user || c.responsavel === user).forEach(c => {
         items.push({ ...c, _tipo: 'contas-fixas', _categoria: '_contas_fixas', _endpoint: '/api/contas-fixas', _date: null, _value: c.valor })
       })
 
@@ -399,23 +399,90 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
         <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
           <div>
             <label className={labelClass}>Nome</label>
-            <input type="text" value={editData.nome || ''} onChange={(e) => setEditData({ ...editData, nome: e.target.value })} className={inputClass} />
+            <input
+              type="text"
+              value={editData.nome || ''}
+              onChange={(e) => setEditData({ ...editData, nome: e.target.value })}
+              className={inputClass}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Valor</label>
-              <input type="number" step="0.01" value={editData.valor || ''} onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })} className={inputClass} />
+              <input
+                type="number"
+                step="0.01"
+                value={editData.valor || ''}
+                onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })}
+                className={inputClass}
+              />
             </div>
             <div>
               <label className={labelClass}>Dia Vencimento</label>
-              <input type="number" value={editData.dia_vencimento || ''} onChange={(e) => setEditData({ ...editData, dia_vencimento: parseInt(e.target.value) })} className={inputClass} />
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={editData.dia_vencimento || ''}
+                onChange={(e) => setEditData({ ...editData, dia_vencimento: parseInt(e.target.value) })}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Categoria</label>
+              <select
+                value={editData.categoria || 'Contas'}
+                onChange={(e) => setEditData({ ...editData, categoria: e.target.value })}
+                className={inputClass}
+              >
+                {CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.emoji} {cat.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Pagamento</label>
+              <select
+                value={editData.payment_method || ''}
+                onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })}
+                className={inputClass}
+              >
+                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
             </div>
           </div>
           <div>
-            <label className={labelClass}>Pagamento</label>
-            <select value={editData.payment_method || ''} onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })} className={inputClass}>
-              {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+            <label className={labelClass}>Responsável</label>
+            <select
+              value={editData.buyer || user}
+              onChange={(e) => setEditData({ ...editData, buyer: e.target.value })}
+              className={inputClass}
+            >
+              <option value={user}>{user}</option>
+              <option value={outro}>{outro}</option>
             </select>
+          </div>
+          <div className="flex gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <div
+                onClick={() => setEditData({ ...editData, cartao_credito: !editData.cartao_credito })}
+                className={`w-9 h-5 rounded-full transition-colors ${editData.cartao_credito ? 'bg-su-500' : 'bg-white/10'} relative`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${editData.cartao_credito ? 'left-4' : 'left-0.5'}`} />
+              </div>
+              <span className="text-white/60 text-xs">Cartão de crédito</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <div
+                onClick={() => setEditData({ ...editData, debito_automatico: !editData.debito_automatico })}
+                className={`w-9 h-5 rounded-full transition-colors ${editData.debito_automatico ? 'bg-su-500' : 'bg-white/10'} relative`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${editData.debito_automatico ? 'left-4' : 'left-0.5'}`} />
+              </div>
+              <span className="text-white/60 text-xs">Débito automático</span>
+            </label>
           </div>
         </div>
       )
@@ -686,6 +753,17 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
             </div>
           )}
         </div>
+
+        {/* Chip rápido: Contas Fixas */}
+        <button
+          onClick={() => setFilters(f => ({ ...f, categoria: f.categoria === '_contas_fixas' ? null : '_contas_fixas' }))}
+          className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all
+            ${filters.categoria === '_contas_fixas'
+              ? `bg-gradient-to-br ${colors.gradient}/20 ${colors.text} border border-current/20`
+              : 'bg-white/5 text-white/50 border border-white/10 hover:text-white/70'}`}
+        >
+          Contas Fixas
+        </button>
 
         {activeFilterCount > 0 && (
           <button

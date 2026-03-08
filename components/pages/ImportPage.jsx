@@ -400,6 +400,19 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
     setLugarSalvo(false)
   }
 
+  const [syncing, setSyncing] = useState(false)
+
+  // Sincroniza com o banco (Pluggy) e depois recarrega pendentes
+  const syncAndLoad = useCallback(async () => {
+    setSyncing(true)
+    try {
+      await fetch('/api/pluggy/sync').catch(() => {})
+    } finally {
+      setSyncing(false)
+    }
+    await loadTransacoes()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadTransacoes = useCallback(async () => {
     setLoading(true)
     try {
@@ -785,11 +798,12 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
             {rematchLoading ? 'Processando...' : 'Re-match'}
           </button>
           <button
-            onClick={loadTransacoes}
-            className="flex items-center gap-1.5 text-white/40 text-xs hover:text-white/70 transition-colors"
+            onClick={syncAndLoad}
+            disabled={syncing}
+            className="flex items-center gap-1.5 text-white/40 text-xs hover:text-white/70 transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={12} />
-            Atualizar
+            {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {syncing ? 'Sincronizando...' : 'Atualizar'}
           </button>
         </div>
       </div>

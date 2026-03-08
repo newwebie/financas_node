@@ -25,13 +25,13 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
 
   return (
     <>
-      {/* Desktop: sidebar fixa com ícones */}
-      <nav className="hidden lg:flex fixed left-0 top-0 bottom-0 w-[72px] z-50
+      {/* Desktop: sidebar fixa — ícones em lg, expandida com labels em xl+ */}
+      <nav className="hidden lg:flex fixed left-0 top-0 bottom-0 w-[72px] xl:w-[200px] z-50
                        bg-base-800/90 backdrop-blur-md border-r border-white/5
-                       flex-col items-center py-4 gap-1">
+                       flex-col items-center xl:items-stretch py-4 gap-1 xl:px-3">
         <button
           onClick={onSwitchUser}
-          className={`w-10 h-10 rounded-2xl mb-4 overflow-hidden
+          className={`w-10 h-10 rounded-2xl mb-4 overflow-hidden self-center
                       ${isSu ? 'ring-2 ring-su-400/30' : 'ring-2 ring-pi-400/30'}
                       shadow-lg hover:scale-105 transition-transform active:scale-95`}
           title={`Trocar (${user})`}
@@ -39,17 +39,17 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
           {renderAvatar()}
         </button>
         {periodo?.dataInicio && (
-          <div className="mb-3 flex flex-col items-center" title="Período da Fatura">
+          <div className="mb-3 flex flex-col items-center" title="Periodo da Fatura">
             <Calendar size={14} className="text-white/30 mb-1" />
-            <p className="text-white/30 text-[8px] leading-tight text-center">
+            <p className="text-white/30 text-[8px] xl:text-[10px] leading-tight text-center">
               {formatDateFull(periodo.dataInicio)?.split(' de ').slice(0, 2).join('/')}
             </p>
-            <p className="text-white/30 text-[8px] leading-tight text-center">
+            <p className="text-white/30 text-[8px] xl:text-[10px] leading-tight text-center">
               {formatDateFull(periodo.dataFim)?.split(' de ').slice(0, 2).join('/')}
             </p>
           </div>
         )}
-        <div className="w-8 h-px bg-white/10 mb-2" />
+        <div className="w-8 xl:w-full h-px bg-white/10 mb-2 self-center" />
         {pages.map((page) => {
           const Icon = ICON_MAP[page.icon]
           const isActive = activePage === page.id
@@ -58,15 +58,17 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
             <button
               key={page.id}
               onClick={() => onNavigate(page.id)}
-              className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200
+              className={`relative w-11 xl:w-full h-11 rounded-xl flex items-center justify-center xl:justify-start xl:gap-3 xl:px-3
+                          transition-all duration-200 self-center xl:self-auto
                           ${isActive
                             ? `bg-white/10 ${isSu ? 'text-su-400' : 'text-pi-400'}`
                             : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}
               title={page.label}
             >
-              <Icon size={20} strokeWidth={1.8} />
+              <Icon size={20} strokeWidth={1.8} className="shrink-0" />
+              <span className="hidden xl:inline text-sm font-medium truncate">{page.label}</span>
               {showBadge && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 xl:static xl:ml-auto w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold shrink-0">
                   {pendentesCount > 9 ? '9+' : pendentesCount}
                 </span>
               )}

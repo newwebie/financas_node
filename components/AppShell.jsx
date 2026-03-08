@@ -129,7 +129,7 @@ export default function AppShell({ user, onSwitchUser }) {
                isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)}
                user={user} colors={colors} onSwitchUser={onSwitchUser}
                periodo={periodo} pendentesCount={pendentesCount} />
-      <main className="flex-1 min-h-screen lg:ml-[72px] relative z-10">
+      <main className="flex-1 min-h-screen lg:ml-[72px] xl:ml-[200px] relative z-10">
         <div className="sticky top-0 z-30 bg-base-900/80 backdrop-blur-md border-b border-white/5
                         px-4 py-3 flex items-center justify-between lg:hidden">
           <button onClick={() => setSidebarOpen(true)}
@@ -142,7 +142,7 @@ export default function AppShell({ user, onSwitchUser }) {
           </div>
           <div className="w-10" />
         </div>
-        <div className="p-4 lg:p-8 max-w-4xl mx-auto pb-24 animate-fade-in" key={activePage}>
+        <div className="p-4 lg:p-6 xl:p-8 max-w-4xl xl:max-w-5xl mx-auto pb-24 animate-fade-in" key={activePage}>
           {renderPage()}
         </div>
       </main>

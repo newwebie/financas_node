@@ -19,8 +19,15 @@ export async function GET(request) {
     const colls = await getCollections()
     const client = getPluggyClient()
 
-    // Buscar todos os itens ativos
-    const items = await colls.pluggy_items.find({ status: { $ne: 'ERROR' } }).toArray()
+    // Buscar itens ativos + itens com ERROR antigo (>12h) para retry automático
+    const retryThreshold = new Date(Date.now() - 12 * 60 * 60 * 1000)
+    const items = await colls.pluggy_items.find({
+      $or: [
+        { status: { $ne: 'ERROR' } },
+        { status: 'ERROR', updatedAt: { $lt: retryThreshold } },
+        { status: 'ERROR', updatedAt: { $exists: false } },
+      ]
+    }).toArray()
 
     const results = []
 

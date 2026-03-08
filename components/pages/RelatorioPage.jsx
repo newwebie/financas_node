@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { SectionTitle, Skeleton, CategoryIcon } from '@/components/ui/Cards'
-import { fmt, formatDateFull, calcPeriodoFatura, CATEGORIAS } from '@/lib/helpers'
-import { ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, Shield, PiggyBank, CreditCard, ShoppingBag, Calendar, Flame, Landmark } from 'lucide-react'
+import { fmt, formatDateFull, getPeriodo, CATEGORIAS } from '@/lib/helpers'
+import { ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, Shield, PiggyBank, CreditCard, ShoppingBag, Calendar, Flame, Landmark, Info } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 export default function RelatorioPage({ user, outro, colors, refreshKey, triggerRefresh }) {
@@ -20,6 +20,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
   const [expandContas, setExpandContas] = useState(false)
   const [expandDespesas, setExpandDespesas] = useState(false)
   const [expandCartao, setExpandCartao] = useState(false)
+  const [emprestimosTerceiros, setEmprestimosTerceiros] = useState([])
 
   useEffect(() => {
     loadData()
@@ -28,17 +29,18 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
   async function loadData() {
     setLoading(true)
     try {
-      const [desp, cf, cfg, metasData, dividas] = await Promise.all([
+      const [desp, cf, cfg, metasData, dividas, empTerceiros] = await Promise.all([
         fetch(`/api/despesas?buyer=${user}`).then(r => r.json()),
         fetch('/api/contas-fixas?all=true').then(r => r.json()),
         fetch(`/api/config?user=${user}`).then(r => r.json()),
         fetch(`/api/metas?user=${user}`).then(r => r.json()),
         fetch(`/api/dividas-terceiros?user=${user}&status=all`).then(r => r.json()),
+        fetch(`/api/emprestimos-terceiros?user=${user}`).then(r => r.json()),
       ])
 
-      const periodoAtual = calcPeriodoFatura(cfg, user, mesesAtras)
-      const periodoAnterior = calcPeriodoFatura(cfg, user, mesesAtras + 1)
-      const periodoDoisAtras = calcPeriodoFatura(cfg, user, mesesAtras + 2)
+      const periodoAtual = getPeriodo(cfg, user, mesesAtras)
+      const periodoAnterior = getPeriodo(cfg, user, mesesAtras + 1)
+      const periodoDoisAtras = getPeriodo(cfg, user, mesesAtras + 2)
 
       const fixasDoUser = cf.filter(c => c.buyer === user || c.responsavel === user)
       // Filtrar contas fixas ativas no período atual para exibição
@@ -53,9 +55,10 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       setConfig(cfg)
       setMetas(metasData)
       setDividasTerceiros(dividas)
+      setEmprestimosTerceiros(empTerceiros)
       setPeriodos({ atual: periodoAtual, anterior: periodoAnterior, doisAtras: periodoDoisAtras })
 
-      calcularMetricas(desp, fixasDoUser, metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras)
+      calcularMetricas(desp, fixasDoUser, metasData, dividas, empTerceiros, periodoAtual, periodoAnterior, periodoDoisAtras)
     } catch (error) {
       console.error('Erro ao carregar relatório:', error)
     } finally {
@@ -103,7 +106,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     })
   }
 
-  function calcularMetricas(allDespesas, fixas, metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras) {
+  function calcularMetricas(allDespesas, fixas, metasData, allDividas, allEmprestimos, periodoAtual, periodoAnterior, periodoDoisAtras) {
     const fixasAtual = filtrarFixasPeriodo(fixas, periodoAtual)
     const fixasAnterior = filtrarFixasPeriodo(fixas, periodoAnterior)
 
@@ -111,9 +114,34 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     const despAnterior = filtrarDespesasPeriodo(allDespesas, periodoAnterior)
     const despDoisAtras = filtrarDespesasPeriodo(allDespesas, periodoDoisAtras)
 
-    const totalAtual = calcTotalPeriodo(despAtual)
-    const totalAnterior = calcTotalPeriodo(despAnterior)
-    const totalDoisAtras = calcTotalPeriodo(despDoisAtras)
+    // Empréstimos a terceiros e dívidas quitadas — contam só no mês em que ocorreram
+    function calcExtras(periodo) {
+      const empTotal = (allEmprestimos || [])
+        .filter(e => {
+          if (e.status !== 'em aberto') return false
+          const d = new Date(e.data_emprestimo)
+          return d >= periodo.dataInicio && d <= periodo.dataFim
+        })
+        .reduce((sum, e) => sum + (e.valor || 0), 0)
+
+      const divTotal = (allDividas || [])
+        .filter(d => {
+          if (d.status !== 'quitado' || !d.data_quitacao) return false
+          const dt = new Date(d.data_quitacao)
+          return dt >= periodo.dataInicio && dt <= periodo.dataFim
+        })
+        .reduce((sum, d) => sum + (d.valor || 0), 0)
+
+      return empTotal + divTotal
+    }
+
+    const extrasAtual = calcExtras(periodoAtual)
+    const extrasAnterior = calcExtras(periodoAnterior)
+    const extrasDoisAtras = calcExtras(periodoDoisAtras)
+
+    const totalAtual = calcTotalPeriodo(despAtual) + extrasAtual
+    const totalAnterior = calcTotalPeriodo(despAnterior) + extrasAnterior
+    const totalDoisAtras = calcTotalPeriodo(despDoisAtras) + extrasDoisAtras
 
     // Cofrinho no período (economia real)
     const cofrinhoItems = allDespesas.filter(d => {
@@ -289,7 +317,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
 
     // Filtrar dívidas que estavam em aberto no período visualizado
     // (criada antes do fim do período E ainda em aberto OU quitada depois do fim do período)
-    const dividasNoPeriodo = dividas.filter(d => {
+    const dividasNoPeriodo = (allDividas || []).filter(d => {
       const dataCriacao = new Date(d.data_emprestimo)
       if (dataCriacao > periodoAtual.dataFim) return false
       if (d.status === 'em aberto') return true
@@ -303,8 +331,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     let controle = 25
     if (compromissoTotal > totalAtual * 0.5) controle -= 10
     else if (compromissoTotal > totalAtual * 0.3) controle -= 5
-    if (dividasNoPeriodo.length > 3) controle -= 10
-    else if (dividasNoPeriodo.length > 0) controle -= 5
+    controle -= Math.min(20, dividasNoPeriodo.length * 5) // 0→+0, 1→-5, 2→-10, 3→-15, 4+→-20
     score += Math.max(0, controle)
 
     score = Math.min(100, Math.max(0, score))
@@ -373,6 +400,28 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       )
     }
     return null
+  }
+
+  function InfoTip({ text, dir = 'center' }) {
+    const [show, setShow] = useState(false)
+    const align = dir === 'left' ? 'left-0' : dir === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2'
+    return (
+      <span className="relative inline-flex items-center">
+        <button
+          onMouseEnter={() => setShow(true)}
+          onMouseLeave={() => setShow(false)}
+          onClick={e => { e.stopPropagation(); setShow(v => !v) }}
+          className="text-white/20 hover:text-white/50 transition-colors ml-1"
+        >
+          <Info size={10} />
+        </button>
+        {show && (
+          <span className={`absolute bottom-full mb-1.5 ${align} w-52 bg-base-800 border border-white/10 rounded-xl p-2.5 text-white/60 text-[10px] leading-relaxed z-50 shadow-xl pointer-events-none`}>
+            {text}
+          </span>
+        )}
+      </span>
+    )
   }
 
   if (loading) {
@@ -501,15 +550,24 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       {/* Quick Metrics */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
-          <p className="text-white/40 text-[10px] mb-1">Total</p>
+          <p className="text-white/40 text-[10px] mb-1 flex items-center justify-center">
+            Total
+            <InfoTip dir="left" text="Despesas lançadas + contas fixas do período + empréstimos a terceiros (mês em que foram feitos) + dívidas quitadas no período." />
+          </p>
           <p className="text-white font-bold text-sm">{fmt(metricas.totalMes)}</p>
         </div>
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
-          <p className="text-white/40 text-[10px] mb-1">Média/Dia</p>
+          <p className="text-white/40 text-[10px] mb-1 flex items-center justify-center">
+            Média/Dia
+            <InfoTip text="Total de gastos do período dividido pelo número de dias." />
+          </p>
           <p className="text-white font-bold text-sm">{fmt(metricas.mediaDia)}</p>
         </div>
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
-          <p className="text-white/40 text-[10px] mb-1">Ticket Médio</p>
+          <p className="text-white/40 text-[10px] mb-1 flex items-center justify-center">
+            Ticket Médio
+            <InfoTip dir="right" text="Valor médio por compra registrada manualmente no período (sem fixas)." />
+          </p>
           <p className="text-white font-bold text-sm">{fmt(metricas.mediaCompra)}</p>
         </div>
       </div>

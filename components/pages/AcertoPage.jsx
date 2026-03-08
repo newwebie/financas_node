@@ -130,6 +130,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
           showFeedback('Empréstimo quitado!')
           fecharModalQuitacao()
           loadData()
+          triggerRefresh()
         } else {
           showFeedback('Erro ao quitar', true)
         }
@@ -148,6 +149,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
           showFeedback('Dívida quitada!')
           fecharModalQuitacao()
           loadData()
+          triggerRefresh()
         } else {
           showFeedback('Erro ao quitar', true)
         }

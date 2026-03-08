@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { fmt, formatDateFull, getCategoryDisplay, getPeriodo, CATEGORIAS } from '@/lib/helpers'
-import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, Target, ChevronDown, HeartPulse } from 'lucide-react'
+import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, Target, ChevronDown, HeartPulse, Info } from 'lucide-react'
 import { CategoryIcon } from '@/components/ui/Cards'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -41,7 +41,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         fetch(`/api/despesas?buyer=${user}`).then(r => r.json()),
         fetch('/api/contas-fixas').then(r => r.json()),
         fetch(`/api/emprestimos-terceiros?user=${user}`).then(r => r.json()),
-        fetch(`/api/dividas-terceiros?user=${user}`).then(r => r.json()),
+        fetch(`/api/dividas-terceiros?user=${user}&status=all`).then(r => r.json()),
         fetch('/api/emprestimos').then(r => r.json()),
         fetch(`/api/config?user=${user}`).then(r => r.json()),
         fetch(`/api/metas?user=${user}`).then(r => r.json()),
@@ -53,8 +53,8 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       setPeriodo(periodoCalc)
 
       setData({ despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config })
-      calcularStats(despesas, contasFixas, emprestimosTerceiros, periodoCalc)
-      calcularCategorias(despesas, contasFixas, periodoCalc)
+      calcularStats(despesas, contasFixas, emprestimosTerceiros, periodoCalc, dividasTerceiros)
+      calcularCategorias(despesas, contasFixas, periodoCalc, dividasTerceiros)
       calcularSituacao(acerto.despesas || [], acerto.emprestimos || [], dividasTerceiros, emprestimosTerceiros)
       calcularMetas(metas, despesas, periodoCalc)
       calcScore(despesas, contasFixas, metas, dividasTerceiros, config, periodoCalc)
@@ -67,7 +67,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
 
   }
 
-  function calcularStats(despesas, contasFixas, emprestimosTerceiros, periodo) {
+  function calcularStats(despesas, contasFixas, emprestimosTerceiros, periodo, dividasTerceiros = []) {
     let cofrinho = 0
     let extra = 0
     let despesasTotal = 0
@@ -101,12 +101,22 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       }
     })
 
+    // Dívidas quitadas no período contam como gasto (dinheiro que saiu do bolso)
+    dividasTerceiros.forEach(d => {
+      if (d.status === 'quitado' && d.data_quitacao) {
+        const dataQuit = new Date(d.data_quitacao)
+        if (dataQuit >= periodo.dataInicio && dataQuit <= periodo.dataFim) {
+          despesasTotal += d.valor
+        }
+      }
+    })
+
     const gastos = despesasTotal + emprestimosTotal
     const total = gastos + cofrinho + extra
     setStats({ gastos, cofrinho, extra, total })
   }
 
-  function calcularCategorias(despesas, contasFixas, periodo) {
+  function calcularCategorias(despesas, contasFixas, periodo, dividasTerceiros = []) {
     const catMap = {}
     const catItens = {}
 
@@ -134,6 +144,24 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         description: d.description,
         payment_method: d.payment_method
       })
+    })
+
+    // Dívidas quitadas no período entram na categoria Contas
+    dividasTerceiros.forEach(d => {
+      if (d.status === 'quitado' && d.data_quitacao) {
+        const dataQuit = new Date(d.data_quitacao)
+        if (dataQuit >= periodo.dataInicio && dataQuit <= periodo.dataFim) {
+          if (!catMap['Contas']) { catMap['Contas'] = 0; catItens['Contas'] = [] }
+          catMap['Contas'] += d.valor
+          catItens['Contas'].push({
+            item: `Quitação: ${d.credor}`,
+            valor: d.valor,
+            data: d.data_quitacao,
+            description: d.descricao || '',
+            payment_method: ''
+          })
+        }
+      }
     })
 
     // Contas fixas removidas do total de gastos e categorias
@@ -355,8 +383,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     let ctrl = 25
     if (compromissoTotal > totalAtual * 0.5) ctrl -= 10
     else if (compromissoTotal > totalAtual * 0.3) ctrl -= 5
-    if (dividasAbertas.length > 3) ctrl -= 10
-    else if (dividasAbertas.length > 0) ctrl -= 5
+    ctrl -= Math.min(20, dividasAbertas.length * 5) // 0→+0, 1→-5, 2→-10, 3→-15, 4+→-20
     score += Math.max(0, ctrl)
 
     setScoreSaude(Math.min(100, Math.max(0, score)))
@@ -374,6 +401,28 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       )
     }
     return null
+  }
+
+  function InfoTip({ text, dir = 'center' }) {
+    const [show, setShow] = useState(false)
+    const align = dir === 'left' ? 'left-0' : dir === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2'
+    return (
+      <span className="relative inline-flex items-center">
+        <button
+          onMouseEnter={() => setShow(true)}
+          onMouseLeave={() => setShow(false)}
+          onClick={e => { e.stopPropagation(); setShow(v => !v) }}
+          className="text-white/20 hover:text-white/50 transition-colors ml-1"
+        >
+          <Info size={10} />
+        </button>
+        {show && (
+          <span className={`absolute bottom-full mb-1.5 ${align} w-52 bg-base-800 border border-white/10 rounded-xl p-2.5 text-white/60 text-[10px] leading-relaxed z-50 shadow-xl pointer-events-none`}>
+            {text}
+          </span>
+        )}
+      </span>
+    )
   }
 
   if (loading) {
@@ -418,7 +467,10 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
         <div className="relative">
           <div className="flex items-start justify-between">
-            <p className="text-white/70 text-[10px] md:text-sm font-medium mb-1">Total de Gastos</p>
+            <p className="text-white/70 text-[10px] md:text-sm font-medium mb-1 flex items-center gap-1">
+              Total de Gastos
+              <InfoTip text="Despesas lançadas no período + empréstimos a terceiros (mês em que foram feitos) + dívidas quitadas. Não inclui Cofrinho nem Renda Variável." />
+            </p>
             {/* Mini-stats */}
             <div className="flex items-center gap-1.5">
               <Target size={12} className="text-white/50" />
@@ -443,7 +495,10 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
               Economia
             </span>
           </div>
-          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1">Cofrinho</p>
+          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1 flex items-center gap-1">
+              Cofrinho
+              <InfoTip dir="left" text="Total guardado no cofrinho neste período." />
+            </p>
           <p className="text-white text-base md:text-2xl font-bold">{fmt(stats.cofrinho)}</p>
         </div>
 
@@ -457,14 +512,20 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
               Extras
             </span>
           </div>
-          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1">Renda Variável</p>
+          <p className="text-white/50 text-[10px] md:text-xs mb-0.5 md:mb-1 flex items-center gap-1">
+              Renda Variável
+              <InfoTip text="Entradas extras registradas neste período." />
+            </p>
           <p className="text-white text-base md:text-2xl font-bold">{fmt(stats.extra)}</p>
         </div>
 
         {/* Saúde Financeira */}
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-3 md:p-5 transition-all relative flex items-center justify-center">
-          <div className={`absolute top-2 left-2 md:top-3 md:left-3 w-5 h-5 md:w-6 md:h-6 rounded-md ${scoreBg} flex items-center justify-center`}>
-            <HeartPulse size={12} className={scoreColor} />
+          <div className={`absolute top-2 left-2 md:top-3 md:left-3 flex items-center gap-1`}>
+            <div className={`w-5 h-5 md:w-6 md:h-6 rounded-md ${scoreBg} flex items-center justify-center`}>
+              <HeartPulse size={12} className={scoreColor} />
+            </div>
+            <InfoTip dir="left" text="Score de 0–100: Cofrinho (25pts) + Metas no limite (25pts) + Tendência vs mês anterior (25pts) + Controle de dívidas (25pts)." />
           </div>
           <div className="relative">
             <svg className="w-[80px] h-[80px] md:w-[110px] md:h-[110px]" viewBox="0 0 80 80">
