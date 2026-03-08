@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ListItem, SectionTitle, EmptyState, Skeleton } from '@/components/ui/Cards'
-import { fmt, formatDateFull, getCategoryEmoji } from '@/lib/helpers'
-import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar, User, Pencil, Trash2, CreditCard, Landmark } from 'lucide-react'
+import { ListItem, SectionTitle, EmptyState, Skeleton, CategoryIcon } from '@/components/ui/Cards'
+import { fmt, formatDateFull, getLocalDate } from '@/lib/helpers'
+import { Check, ChevronDown, X, Users, UserPlus, Wallet, Receipt, History, Calendar, User, Pencil, Trash2, CreditCard, Landmark, CircleCheck, Sparkles, Handshake } from 'lucide-react'
 
 export default function AcertoPage({ user, outro, colors, refreshKey, triggerRefresh, focusSection, clearFocus, openEditItem }) {
   const [loading, setLoading] = useState(true)
@@ -21,7 +21,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
   const [expandHistorico, setExpandHistorico] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [quitandoItem, setQuitandoItem] = useState(null) // { id, tipo, valor, nome }
-  const [dataQuitacao, setDataQuitacao] = useState(new Date().toISOString().split('T')[0])
+  const [dataQuitacao, setDataQuitacao] = useState(getLocalDate())
 
   const pendentesRef = useRef(null)
   const emprestimosRef = useRef(null)
@@ -102,7 +102,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
 
   function abrirModalQuitacao(id, tipo, valor, nome) {
     setQuitandoItem({ id, tipo, valor, nome })
-    setDataQuitacao(new Date().toISOString().split('T')[0])
+    setDataQuitacao(getLocalDate())
   }
 
   function fecharModalQuitacao() {
@@ -332,7 +332,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
             </h2>
             <p className="text-white/80 text-sm mb-6">
               {saldo.liquido === 0
-                ? '✨ Tudo em dia!'
+                ? 'Tudo em dia!'
                 : saldo.liquido > 0
                 ? `${outro} te deve`
                 : `Você deve para ${outro}`}
@@ -386,7 +386,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-medium flex items-center gap-1.5">
-                          <span>{getCategoryEmoji(d.label)}</span>
+                          <CategoryIcon category={d.label} size={14} className="text-white/60" />
                           {d.item}
                         </p>
                         <p className="text-white/40 text-xs truncate mt-1">{d.description || 'Sem descricao'}</p>
@@ -405,7 +405,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-medium flex items-center gap-1.5">
-                          <span>🤝</span>
+                          <Handshake size={14} className="text-white/60" />
                           Empréstimo
                         </p>
                         <p className="text-white/40 text-xs truncate mt-1">{e.descricao || 'Sem descricao'}</p>
@@ -646,7 +646,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
         data.acertos.length === 0 &&
         contasFixas.length === 0 && (
           <EmptyState
-            icon="✨"
+            icon={Sparkles}
             message="Tudo em ordem!"
             sub="Nenhuma pendência ou acerto no momento"
           />

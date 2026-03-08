@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { SectionTitle, ListItem, Skeleton } from '@/components/ui/Cards'
-import { fmt, formatDateFull, getCategoryDisplay, getCategoryEmoji, getUserColors, calcPeriodoFatura } from '@/lib/helpers'
+import { SectionTitle, ListItem, Skeleton, CategoryIcon } from '@/components/ui/Cards'
+import { fmt, formatDateFull, getCategoryDisplay, getUserColors, calcPeriodoFatura } from '@/lib/helpers'
 import { ChevronDown, ChevronLeft, ChevronRight, Users, TrendingUp, TrendingDown, ArrowRight, Flame, Scale } from 'lucide-react'
 
 export default function AmbasPage({ user, outro, colors, refreshKey, triggerRefresh }) {
@@ -317,7 +317,7 @@ export default function AmbasPage({ user, outro, colors, refreshKey, triggerRefr
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="text-white text-xs font-medium truncate">
-                        {getCategoryEmoji(d.label)} {d.item || d.label}
+                        {d.item || d.label}
                       </p>
                       <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: buyerColors.hex }} />
                     </div>

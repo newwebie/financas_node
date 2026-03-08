@@ -3,15 +3,15 @@
 import { formatDateFull } from '@/lib/helpers'
 import {
   Home, Plus, Handshake, BarChart3, Fuel, Target,
-  Users, Pencil, Settings, ArrowLeftRight, ChevronLeft, Menu, Calendar
+  Users, Pencil, Settings, ArrowLeftRight, ChevronLeft, Menu, Calendar, Download, MapPin
 } from 'lucide-react'
 
 const ICON_MAP = {
   Home, Plus, Handshake, BarChart3, Fuel, Target,
-  Users, Pencil, Settings,
+  Users, Pencil, Settings, Download, MapPin,
 }
 
-export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggle, user, colors, onSwitchUser, periodo }) {
+export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggle, user, colors, onSwitchUser, periodo, pendentesCount = 0 }) {
   const isSu = user === 'Susanna'
   const emoji = isSu ? '⚡' : '🔱'
 
@@ -53,17 +53,23 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
         {pages.map((page) => {
           const Icon = ICON_MAP[page.icon]
           const isActive = activePage === page.id
+          const showBadge = page.id === 'import' && pendentesCount > 0
           return (
             <button
               key={page.id}
               onClick={() => onNavigate(page.id)}
-              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200
+              className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200
                           ${isActive
                             ? `bg-white/10 ${isSu ? 'text-su-400' : 'text-pi-400'}`
                             : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}
               title={page.label}
             >
               <Icon size={20} strokeWidth={1.8} />
+              {showBadge && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+                  {pendentesCount > 9 ? '9+' : pendentesCount}
+                </span>
+              )}
             </button>
           )
         })}
@@ -102,6 +108,7 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
           {pages.map((page) => {
             const Icon = ICON_MAP[page.icon]
             const isActive = activePage === page.id
+            const showBadge = page.id === 'import' && pendentesCount > 0
             return (
               <button
                 key={page.id}
@@ -111,8 +118,20 @@ export default function Sidebar({ pages, activePage, onNavigate, isOpen, onToggl
                               ? `bg-white/10 ${isSu ? 'text-su-400' : 'text-pi-400'}`
                               : 'text-white/50 hover:text-white/80 hover:bg-white/5'}`}
               >
-                <Icon size={20} strokeWidth={1.8} />
+                <div className="relative flex-shrink-0">
+                  <Icon size={20} strokeWidth={1.8} />
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+                      {pendentesCount > 9 ? '9+' : pendentesCount}
+                    </span>
+                  )}
+                </div>
                 <span className="text-sm font-medium">{page.label}</span>
+                {showBadge && (
+                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {pendentesCount > 9 ? '9+' : pendentesCount}
+                  </span>
+                )}
               </button>
             )
           })}

@@ -36,6 +36,8 @@ export async function POST(request) {
       valor_pendente: body.valor_pendente || null,
       status_pendencia: body.status_pendencia || null,
       uso_pessoal: body.uso_pessoal || false,
+      lugar_nome: body.lugar_nome || null,
+      auto_lancado: body.auto_lancado || false,
     }
     const result = await colls.despesas.insertOne(doc)
     if (doc.tem_pendencia && doc.devedor) {

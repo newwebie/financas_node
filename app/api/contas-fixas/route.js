@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server'
 import { getCollections } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const includeInactive = searchParams.get('all') === 'true'
     const colls = await getCollections()
-    const contas = await colls.contas_fixas.find({ ativo: true }).toArray()
+    const query = includeInactive ? {} : { ativo: { $ne: false } }
+    const contas = await colls.contas_fixas.find(query).toArray()
     return NextResponse.json(contas.map(c => ({ ...c, _id: c._id.toString() })))
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -39,6 +42,7 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
     const colls = await getCollections()
     await colls.contas_fixas.deleteOne({ _id: new ObjectId(id) })
     return NextResponse.json({ success: true })

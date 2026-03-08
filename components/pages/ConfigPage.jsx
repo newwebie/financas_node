@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/Cards'
 import { formatDateFull, getPeriodo } from '@/lib/helpers'
-import { Settings, Calendar, Check, Save } from 'lucide-react'
+import { Settings, Calendar, Check, Save, Info } from 'lucide-react'
 
 export default function ConfigPage({ user, outro, colors, refreshKey, triggerRefresh }) {
   const [loading, setLoading] = useState(true)
@@ -192,7 +192,7 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
 
       {/* Informações Adicionais */}
       <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-6">
-        <h2 className="text-white font-semibold mb-3">ℹ️ Sobre o Período</h2>
+        <h2 className="text-white font-semibold mb-3 flex items-center gap-2"><Info size={18} className="text-white/60" /> Sobre o Período</h2>
         <div className="space-y-2 text-white/60 text-sm">
           <p>
             • O período define quando inicia e termina sua fatura mensal
@@ -211,7 +211,7 @@ export default function ConfigPage({ user, outro, colors, refreshKey, triggerRef
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 animate-slide-up z-50">
+        <div className="fixed bottom-6 right-6 bg-mint-500 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 animate-slide-up z-50">
           <Check size={20} />
           <span className="font-medium">{toast}</span>
         </div>

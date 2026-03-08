@@ -2,22 +2,17 @@
 
 import { useState } from 'react'
 import { SectionTitle } from '@/components/ui/Cards'
-import { CATEGORIAS, PAYMENT_METHODS } from '@/lib/helpers'
+import { CATEGORIAS, PAYMENT_METHODS, getLocalDate } from '@/lib/helpers'
 import { Plus, Handshake, CreditCard, Receipt, Bike, Car, Check, ArrowLeft } from 'lucide-react'
 
 const TIPOS = [
-  { id: 'moto', label: 'Moto', icon: Bike, emoji: '🏍️' },
-  { id: 'carro', label: 'Carro', icon: Car, emoji: '🚗' },
-  { id: 'gasto', label: 'Gasto', icon: Plus, emoji: '💰' },
-  { id: 'emprestei', label: 'Empréstimos', icon: Handshake, emoji: '🤝' },
-  { id: 'devo', label: 'Dívidas', icon: CreditCard, emoji: '💳' },
-  { id: 'conta-fixa', label: 'Conta Fixa', icon: Receipt, emoji: '📄' },
+  { id: 'moto', label: 'Moto', icon: Bike },
+  { id: 'carro', label: 'Carro', icon: Car },
+  { id: 'gasto', label: 'Gasto', icon: Plus },
+  { id: 'emprestei', label: 'Empréstimos', icon: Handshake },
+  { id: 'devo', label: 'Dívidas', icon: CreditCard },
+  { id: 'conta-fixa', label: 'Conta Fixa', icon: Receipt },
 ]
-
-function getLocalDate() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
 
 export default function NovoPage({ user, outro, colors, refreshKey, triggerRefresh }) {
   const [tipo, setTipo] = useState(null) // Começa null para mostrar seleção
@@ -75,7 +70,7 @@ export default function NovoPage({ user, outro, colors, refreshKey, triggerRefre
   function getDefaultDate(daysOffset = 0) {
     const date = new Date()
     date.setDate(date.getDate() + daysOffset)
-    return date.toISOString().split('T')[0]
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   }
 
   function showFeedback(message, isError = false) {

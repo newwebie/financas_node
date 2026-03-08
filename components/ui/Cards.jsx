@@ -1,5 +1,36 @@
 'use client'
 
+import { Utensils, Fuel, Car, Beer, Shirt, Pill, Gamepad2, Receipt, Home, PiggyBank, TrendingUp, Scissors, Package, Handshake, Target, FileText, Landmark, Search, Eye, Users } from 'lucide-react'
+
+// Mapa de icones Lucide por categoria
+const ICON_MAP = {
+  Comida: Utensils,
+  Combustivel: Fuel,
+  Automoveis: Car,
+  Bebidas: Beer,
+  Vestuario: Shirt,
+  Saude: Pill,
+  Lazer: Gamepad2,
+  Contas: Receipt,
+  'Boa pra familia': Users,
+  Cofrinho: PiggyBank,
+  'Renda Variavel': TrendingUp,
+  Trancas: Scissors,
+  Taro: Eye,
+  Outros: Package,
+  _emprestimo_pessoal: Handshake,
+  _contas_fixas: FileText,
+  _metas: Target,
+  _emprestimo_terceiros: Landmark,
+  _dividas_terceiros: FileText,
+  Emprestei: Handshake,
+}
+
+export function CategoryIcon({ category, size = 16, className = '' }) {
+  const Icon = ICON_MAP[category] || Package
+  return <Icon size={size} className={className} />
+}
+
 // Card base com efeito glass
 export function Card({ children, className = '', onClick }) {
   return (
@@ -32,7 +63,7 @@ export function StatCard({ icon, label, value, color = 'neutral', delay = 0, cla
   }
   return (
     <div
-      className={`rounded-2xl border p-4 overflow-hidden animate-slide-up ${colorMap[color]} ${className}`}
+      className={`rounded-3xl border p-4 overflow-hidden animate-slide-up ${colorMap[color]} ${className}`}
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'backwards' }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -84,7 +115,7 @@ export function ListItem({ children, borderColor = 'rgba(255,255,255,0.1)', onCl
 export function Skeleton({ className = '' }) {
   return (
     <div className={`rounded-2xl bg-gradient-to-r from-white/[0.03] via-white/[0.06] to-white/[0.03]
-                      bg-[length:200%_100%] animate-[shimmer_2s_linear_infinite] ${className}`} />
+                      bg-[length:200%_100%] animate-shimmer ${className}`} />
   )
 }
 
@@ -98,11 +129,15 @@ export function CardSkeleton() {
   )
 }
 
-// Estado vazio
-export function EmptyState({ icon = '📝', message = 'Nenhum dado encontrado', sub }) {
+// Estado vazio - icon aceita componente Lucide ou string
+export function EmptyState({ icon: Icon, message = 'Nenhum dado encontrado', sub }) {
   return (
     <div className="text-center py-16">
-      <span className="text-5xl block mb-4">{icon}</span>
+      {Icon && (
+        typeof Icon === 'function'
+          ? <Icon size={48} className="text-white/20 mx-auto mb-4" />
+          : <span className="text-5xl block mb-4">{Icon}</span>
+      )}
       <p className="text-white/50 text-sm">{message}</p>
       {sub && <p className="text-white/30 text-xs mt-2">{sub}</p>}
     </div>
@@ -115,16 +150,20 @@ export function SectionTitle({ children, className = '' }) {
 }
 
 // Badge
-export function Badge({ children, color = 'neutral' }) {
+export function Badge({ children, color = 'neutral', icon }) {
   const colorMap = {
     su: 'bg-su-400/15 text-su-300 border-su-400/20',
     pi: 'bg-pi-400/15 text-pi-300 border-pi-400/20',
     mint: 'bg-emerald-400/15 text-emerald-400 border-emerald-400/20',
     coral: 'bg-red-400/15 text-red-400 border-red-400/20',
     neutral: 'bg-white/5 text-white/50 border-white/10',
+    green: 'bg-emerald-400/15 text-emerald-400 border-emerald-400/20',
+    red: 'bg-red-400/15 text-red-400 border-red-400/20',
+    yellow: 'bg-amber-400/15 text-amber-400 border-amber-400/20',
   }
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorMap[color]}`}>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorMap[color] || colorMap.neutral}`}>
+      {icon}
       {children}
     </span>
   )

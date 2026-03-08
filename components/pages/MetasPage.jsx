@@ -230,13 +230,13 @@ export default function MetasPage({ user, outro, colors, refreshKey, triggerRefr
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-12 text-center">
           <Target size={48} className="text-white/20 mx-auto mb-4" />
           <p className="text-white/40 text-sm mb-2">Nenhuma meta cadastrada</p>
-          <p className="text-white/30 text-xs">Clique em "Nova Meta" para começar</p>
+          <p className="text-white/30 text-xs">Clique em &quot;Nova Meta&quot; para começar</p>
         </div>
       )}
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 animate-slide-up z-50">
+        <div className="fixed bottom-6 right-6 bg-mint-500 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 animate-slide-up z-50">
           <Check size={20} />
           <span className="font-medium">{toast}</span>
         </div>

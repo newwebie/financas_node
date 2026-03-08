@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { fmt, formatDateFull, getCategoryDisplay, getPeriodo, CATEGORIAS } from '@/lib/helpers'
 import { TrendingUp, TrendingDown, PiggyBank, Coins, CircleAlert, CircleCheck, ArrowUpRight, ArrowDownRight, Target, ChevronDown, HeartPulse } from 'lucide-react'
+import { CategoryIcon } from '@/components/ui/Cards'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 export default function HomePage({ user, outro, colors, refreshKey, triggerRefresh, openEditItem, openAcerto }) {
@@ -22,7 +23,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
   const [categoriasComItens, setCategoriasComItens] = useState({})
   const [showOutrosDetalhes, setShowOutrosDetalhes] = useState(false)
   const [expandedCategory, setExpandedCategory] = useState(null)
-  const [situacao, setSituacao] = useState({ saldo: 0, dividasTerceiros: 0, emprestimosTerceiros: 0 })
+  const [situacao, setSituacao] = useState({ saldo: 0, aReceber: 0, aPagar: 0, dividasTerceiros: 0, emprestimosTerceiros: 0 })
   const [metasInfo, setMetasInfo] = useState({ total: 0, noLimite: 0, excedidas: 0 })
   const [scoreSaude, setScoreSaude] = useState(0)
   const [periodo, setPeriodo] = useState({ dataInicio: null, dataFim: null })
@@ -34,8 +35,9 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
 
   async function loadData() {
     setLoading(true)
+
     try {
-      const [despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config, metas] = await Promise.all([
+      const [despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config, metas, acerto] = await Promise.all([
         fetch(`/api/despesas?buyer=${user}`).then(r => r.json()),
         fetch('/api/contas-fixas').then(r => r.json()),
         fetch(`/api/emprestimos-terceiros?user=${user}`).then(r => r.json()),
@@ -43,6 +45,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         fetch('/api/emprestimos').then(r => r.json()),
         fetch(`/api/config?user=${user}`).then(r => r.json()),
         fetch(`/api/metas?user=${user}`).then(r => r.json()),
+        fetch('/api/acerto').then(r => r.json()).catch(() => ({ despesas: [], emprestimos: [] })),
       ])
 
       // Usando periodo customizado se existir, senao calcula
@@ -52,7 +55,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       setData({ despesas, contasFixas, emprestimosTerceiros, dividasTerceiros, emprestimos, config })
       calcularStats(despesas, contasFixas, emprestimosTerceiros, periodoCalc)
       calcularCategorias(despesas, contasFixas, periodoCalc)
-      calcularSituacao(despesas, emprestimos, dividasTerceiros, emprestimosTerceiros)
+      calcularSituacao(acerto.despesas || [], acerto.emprestimos || [], dividasTerceiros, emprestimosTerceiros)
       calcularMetas(metas, despesas, periodoCalc)
       calcScore(despesas, contasFixas, metas, dividasTerceiros, config, periodoCalc)
       getRecentTransactions(despesas, periodoCalc)
@@ -61,6 +64,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
     } finally {
       setLoading(false)
     }
+
   }
 
   function calcularStats(despesas, contasFixas, emprestimosTerceiros, periodo) {
@@ -169,26 +173,21 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
   }
 
   function calcularSituacao(despesas, emprestimos, dividasTerceiros, emprestimosTerceiros) {
-    let saldo = 0
+    // Usa dados de /api/acerto (sem filtro de buyer) — mesma fonte que AcertoPage
+    let aReceber = 0 // quanto outro me deve
+    let aPagar = 0   // quanto eu devo ao outro
 
     despesas.forEach(d => {
-      if (d.status_pendencia === 'em aberto' && d.devedor === outro) {
-        saldo += d.valor_pendente || 0
-      }
-      if (d.status_pendencia === 'em aberto' && d.devedor === user) {
-        saldo -= d.valor_pendente || 0
-      }
+      if (d.devedor === outro) aReceber += d.valor_pendente || 0
+      if (d.devedor === user)  aPagar  += d.valor_pendente || 0
     })
 
     emprestimos.forEach(e => {
-      if (e.status === 'em aberto') {
-        if (e.de === user) {
-          saldo += e.valor
-        } else if (e.de === outro) {
-          saldo -= e.valor
-        }
-      }
+      if (e.de === user)  aReceber += e.valor || 0  // eu emprestei → outro deve
+      if (e.de === outro) aPagar   += e.valor || 0  // outro emprestou → eu devo
     })
+
+    const saldo = aReceber - aPagar
 
     const dividasTerceirosTotal = dividasTerceiros
       .filter(d => d.status === 'em aberto')
@@ -204,6 +203,8 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
 
     setSituacao({
       saldo,
+      aReceber,
+      aPagar,
       dividasTerceiros: dividasTerceirosTotal + dividasPessoais,
       emprestimosTerceiros: emprestimosTerceirosTotal,
     })
@@ -400,6 +401,8 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
 
   return (
     <div className="space-y-6 animate-fade-in">
+
+
       {/* Período da Fatura (desktop only) */}
       <div className="hidden md:flex items-center justify-between">
         <div>
@@ -431,11 +434,10 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-3 gap-2 md:gap-4">
         {/* Cofrinho */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 hover:border-mint-400/30 transition-all">
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-3 md:p-5 hover:border-mint-400/30 transition-all">
           <div className="flex items-center justify-between mb-2 md:mb-4">
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-mint-500/20 flex items-center justify-center">
-              <PiggyBank size={16} className="text-mint-400 md:hidden" />
-              <PiggyBank size={20} className="text-mint-400 hidden md:block" />
+              <PiggyBank size={18} className="text-mint-400" />
             </div>
             <span className="text-mint-400 text-[10px] md:text-xs font-medium px-1.5 py-0.5 md:px-2 md:py-1 bg-mint-500/10 rounded-lg">
               Economia
@@ -446,11 +448,10 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         </div>
 
         {/* Renda Variável */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 hover:border-peach-400/30 transition-all">
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-3 md:p-5 hover:border-peach-400/30 transition-all">
           <div className="flex items-center justify-between mb-2 md:mb-4">
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-peach-500/20 flex items-center justify-center">
-              <Coins size={16} className="text-peach-400 md:hidden" />
-              <Coins size={20} className="text-peach-400 hidden md:block" />
+              <Coins size={18} className="text-peach-400" />
             </div>
             <span className="text-peach-400 text-[10px] md:text-xs font-medium px-1.5 py-0.5 md:px-2 md:py-1 bg-peach-500/10 rounded-lg">
               Extras
@@ -461,10 +462,9 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         </div>
 
         {/* Saúde Financeira */}
-        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl p-3 md:p-5 transition-all relative flex items-center justify-center">
+        <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-3 md:p-5 transition-all relative flex items-center justify-center">
           <div className={`absolute top-2 left-2 md:top-3 md:left-3 w-5 h-5 md:w-6 md:h-6 rounded-md ${scoreBg} flex items-center justify-center`}>
-            <HeartPulse size={10} className={`${scoreColor} md:hidden`} />
-            <HeartPulse size={12} className={`${scoreColor} hidden md:block`} />
+            <HeartPulse size={12} className={scoreColor} />
           </div>
           <div className="relative">
             <svg className="w-[80px] h-[80px] md:w-[110px] md:h-[110px]" viewBox="0 0 80 80">
@@ -483,7 +483,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-xl md:text-3xl font-bold text-white">{scoreSaude}</span>
-                <span className={`text-[8px] md:text-[10px] font-medium ${scoreColor}`}>{scoreLabel}</span>
+                <span className={`text-[10px] font-medium ${scoreColor}`}>{scoreLabel}</span>
               </div>
             </div>
         </div>
@@ -522,7 +522,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
                 {chartData.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-1.5 md:gap-2">
                     <div className="w-2 h-2 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-white/60 text-[8px] md:text-xs truncate">{item.name}</span>
+                    <span className="text-white/60 text-[10px] md:text-xs truncate">{item.name}</span>
                   </div>
                 ))}
               </div>
@@ -688,46 +688,39 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         {/* Saldo com outra pessoa */}
         <div
           onClick={() => openAcerto && openAcerto('pendentes')}
-          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
+          className={`bg-base-700/50 backdrop-blur-sm rounded-3xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.saldo > 0 ? 'border-mint-500/30' : situacao.saldo < 0 ? 'border-coral-500/30' : 'border-white/5'
         }`}>
           <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-3">
             {situacao.saldo > 0 ? (
-              <>
-                <ArrowUpRight className="text-mint-400 md:hidden" size={16} />
-                <ArrowUpRight className="text-mint-400 hidden md:block" size={20} />
-              </>
+              <ArrowUpRight className="text-mint-400 shrink-0" size={16} />
             ) : situacao.saldo < 0 ? (
-              <>
-                <ArrowDownRight className="text-coral-400 md:hidden" size={16} />
-                <ArrowDownRight className="text-coral-400 hidden md:block" size={20} />
-              </>
+              <ArrowDownRight className="text-coral-400 shrink-0" size={16} />
             ) : (
-              <>
-                <CircleCheck className="text-white/40 md:hidden" size={16} />
-                <CircleCheck className="text-white/40 hidden md:block" size={20} />
-              </>
+              <CircleCheck className="text-white/40 shrink-0" size={16} />
             )}
             <p className="text-white/60 text-[10px] md:text-xs font-medium truncate">
               {situacao.saldo > 0 ? `${outro} te deve` : situacao.saldo < 0 ? `Você deve` : 'Acertos'}
             </p>
           </div>
-          <p className={`text-base md:text-2xl font-bold ${
-            situacao.saldo > 0 ? 'text-mint-400' : situacao.saldo < 0 ? 'text-coral-400' : 'text-white/40'
-          }`}>
-            {situacao.saldo === 0 ? 'Em dia' : fmt(Math.abs(situacao.saldo))}
-          </p>
+
+          {situacao.saldo === 0 ? (
+            <p className="text-white/40 text-base md:text-2xl font-bold">Em dia</p>
+          ) : (
+            <p className={`text-base md:text-2xl font-bold ${situacao.saldo > 0 ? 'text-mint-400' : 'text-coral-400'}`}>
+              {fmt(Math.abs(situacao.saldo))}
+            </p>
+          )}
         </div>
 
         {/* Dívidas */}
         <div
           onClick={() => openAcerto && openAcerto('dividas')}
-          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
+          className={`bg-base-700/50 backdrop-blur-sm rounded-3xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.dividasTerceiros > 0 ? 'border-peach-500/30' : 'border-white/5'
         }`}>
           <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-3">
-            <CircleAlert className={`${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} md:hidden`} size={16} />
-            <CircleAlert className={`${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} hidden md:block`} size={20} />
+            <CircleAlert className={situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'} size={18} />
             <p className="text-white/60 text-[10px] md:text-xs font-medium">Dívidas</p>
           </div>
           <p className={`text-base md:text-2xl font-bold ${situacao.dividasTerceiros > 0 ? 'text-peach-400' : 'text-white/40'}`}>
@@ -738,12 +731,11 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
         {/* Empréstimos a Terceiros */}
         <div
           onClick={() => openAcerto && openAcerto('emprestimos')}
-          className={`bg-base-700/50 backdrop-blur-sm rounded-2xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
+          className={`bg-base-700/50 backdrop-blur-sm rounded-3xl p-3 md:p-5 border-2 cursor-pointer hover:bg-base-700/70 transition-all ${
           situacao.emprestimosTerceiros > 0 ? 'border-lavender-500/30' : 'border-white/5'
         }`}>
           <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-3">
-            <TrendingUp className={`${situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'} md:hidden`} size={16} />
-            <TrendingUp className={`${situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'} hidden md:block`} size={20} />
+            <TrendingUp className={situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'} size={18} />
             <p className="text-white/60 text-[10px] md:text-xs font-medium">A Receber</p>
           </div>
           <p className={`text-base md:text-2xl font-bold ${situacao.emprestimosTerceiros > 0 ? 'text-lavender-400' : 'text-white/40'}`}>
@@ -765,9 +757,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} bg-opacity-20 flex items-center justify-center flex-shrink-0`}>
-                    <span className="text-lg">
-                      {CATEGORIAS.find(c => c.id === txn.label)?.emoji || '📦'}
-                    </span>
+                    <CategoryIcon category={txn.label} size={18} className="text-white" />
                   </div>
                   <div className="flex-1 min-w-0 text-left">
                     <p className="text-white text-sm font-medium truncate">{txn.item}</p>

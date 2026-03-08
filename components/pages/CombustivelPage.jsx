@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { StatCard, ListItem, SectionTitle, Skeleton } from '@/components/ui/Cards'
 import { fmt, formatDateFull, getUserColors } from '@/lib/helpers'
-import { Fuel, ChevronDown } from 'lucide-react'
+import { Fuel, ChevronDown, Bike, Car } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts'
 
 export default function CombustivelPage({ user, outro, colors, refreshKey, triggerRefresh }) {
@@ -205,8 +205,10 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <h1 className="text-2xl font-semibold text-white">Combustível</h1>
-      <p className="text-white/40 text-sm">Controle de abastecimentos</p>
+      <div>
+        <h1 className="text-2xl font-semibold text-white">Combustível</h1>
+        <p className="text-white/40 text-sm">Controle de abastecimentos</p>
+      </div>
 
       {/* Cards de Último Abastecimento */}
       <div className="grid grid-cols-2 gap-2 md:gap-4">
@@ -260,7 +262,7 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
           <div className="grid grid-cols-2 gap-2 md:gap-6 mt-3 md:mt-4">
             {/* Gráfico Moto */}
             <div>
-              <h3 className="text-white/60 text-[10px] md:text-sm font-medium mb-2 md:mb-4 text-center">🏍️ Moto</h3>
+              <h3 className="text-white/60 text-[10px] md:text-sm font-medium mb-2 md:mb-4 text-center flex items-center justify-center gap-1.5"><Bike size={14} className="text-white/40" /> Moto</h3>
               {chartData.moto.length > 0 ? (
                 <ResponsiveContainer width="100%" height={140} className="md:!h-[200px]">
                   <PieChart>
@@ -301,7 +303,7 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
 
             {/* Gráfico Carro */}
             <div>
-              <h3 className="text-white/60 text-[10px] md:text-sm font-medium mb-2 md:mb-4 text-center">🚗 Carro</h3>
+              <h3 className="text-white/60 text-[10px] md:text-sm font-medium mb-2 md:mb-4 text-center flex items-center justify-center gap-1.5"><Car size={14} className="text-white/40" /> Carro</h3>
               {chartData.carro.length > 0 ? (
                 <ResponsiveContainer width="100%" height={140} className="md:!h-[200px]">
                   <PieChart>
@@ -603,7 +605,7 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
             <div className="px-5 pb-5 grid grid-cols-2 gap-4">
               {/* Moto */}
               <div>
-                <p className="text-white/50 text-xs font-medium mb-2">🏍️ Moto</p>
+                <p className="text-white/50 text-xs font-medium mb-2 flex items-center gap-1.5"><Bike size={12} className="text-white/40" /> Moto</p>
                 {combustiveis.moto.length > 0 ? (
                   <div className="space-y-1.5">
                     {combustiveis.moto.slice(0, 5).map((d) => (
@@ -624,7 +626,7 @@ export default function CombustivelPage({ user, outro, colors, refreshKey, trigg
 
               {/* Carro */}
               <div>
-                <p className="text-white/50 text-xs font-medium mb-2">🚗 Carro</p>
+                <p className="text-white/50 text-xs font-medium mb-2 flex items-center gap-1.5"><Car size={12} className="text-white/40" /> Carro</p>
                 {combustiveis.carro.length > 0 ? (
                   <div className="space-y-1.5">
                     {combustiveis.carro.slice(0, 5).map((d) => (

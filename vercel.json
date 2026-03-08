@@ -3,6 +3,14 @@
     {
       "path": "/api/verificar-lembretes",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/pluggy/sync",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/limpeza-pendentes",
+      "schedule": "0 3 1 * *"
     }
   ]
 }

@@ -1,17 +1,17 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Skeleton, EmptyState, Badge } from '@/components/ui/Cards'
-import { fmt, formatDateFull, formatDate, getCategoryEmoji, getCategoryDisplay, CATEGORIES, CATEGORIAS, PAYMENT_METHODS, STATUS_TERCEIROS } from '@/lib/helpers'
-import { ChevronDown, Save, Trash2, Check, CircleAlert, Search, X, ArrowDown, ArrowUp } from 'lucide-react'
+import { Skeleton, EmptyState, Badge, CategoryIcon } from '@/components/ui/Cards'
+import { fmt, formatDateFull, formatDate, getCategoryDisplay, CATEGORIES, CATEGORIAS, PAYMENT_METHODS, STATUS_TERCEIROS, toLocalDateString } from '@/lib/helpers'
+import { ChevronDown, Save, Trash2, Ban, Check, CircleAlert, Search, X, ArrowDown, ArrowUp } from 'lucide-react'
 
 // Pseudo-categorias para tipos que nao sao despesas
 const EXTRA_CATEGORIAS = [
-  { id: '_emprestimo_pessoal', emoji: '🤝', label: 'Empréstimo Pessoal' },
-  { id: '_contas_fixas', emoji: '📄', label: 'Contas Fixas' },
-  { id: '_metas', emoji: '🎯', label: 'Metas' },
-  { id: '_emprestimo_terceiros', emoji: '🏦', label: 'Empréstimo (3os)' },
-  { id: '_dividas_terceiros', emoji: '📝', label: 'Dívidas (3os)' },
+  { id: '_emprestimo_pessoal', label: 'Empréstimo Pessoal' },
+  { id: '_contas_fixas', label: 'Contas Fixas' },
+  { id: '_metas', label: 'Metas' },
+  { id: '_emprestimo_terceiros', label: 'Empréstimo (3os)' },
+  { id: '_dividas_terceiros', label: 'Dívidas (3os)' },
 ]
 
 const ALL_CATEGORIAS = [...CATEGORIAS, ...EXTRA_CATEGORIAS]
@@ -225,6 +225,28 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
     }
   }
 
+  async function handleCancelarContaFixa(item) {
+    if (!confirm(`Cancelar "${item.nome}"? Ela não aparecerá mais nos próximos meses.`)) return
+    try {
+      const res = await fetch(item._endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _id: item._id, ativo: false, data_cancelamento: new Date().toISOString() }),
+      })
+      if (res.ok) {
+        showToast('Conta fixa cancelada!', 'success')
+        setExpandedId(null)
+        await loadAllData()
+        triggerRefresh()
+      } else {
+        showToast('Erro ao cancelar', 'error')
+      }
+    } catch (error) {
+      console.error('Erro ao cancelar:', error)
+      showToast('Erro ao cancelar', 'error')
+    }
+  }
+
   function showToast(message, type = 'success') {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3000)
@@ -248,42 +270,42 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       case 'despesas':
         return {
           name: item.item || item.label || 'Item',
-          emoji: getCategoryEmoji(item.label),
+          catId: item.label,
           value: item.total_value,
           meta: [item.payment_method, item.createdAt ? formatDate(item.createdAt) : null, item.installment > 1 ? `${item.installment}x` : null].filter(Boolean).join(' · '),
         }
       case 'contas-fixas':
         return {
           name: item.nome || 'Conta',
-          emoji: '📄',
+          catId: '_contas_fixas',
           value: item.valor,
           meta: [item.payment_method, item.dia_vencimento ? `Dia ${item.dia_vencimento}` : null].filter(Boolean).join(' · '),
         }
       case 'metas':
         return {
           name: getCategoryDisplay(item.categoria) || 'Meta',
-          emoji: getCategoryEmoji(item.categoria),
+          catId: item.categoria,
           value: item.limite,
           meta: 'Limite mensal',
         }
       case 'emprestimos':
         return {
           name: `Emprestei p/ ${item.para || '?'}`,
-          emoji: '🤝',
+          catId: '_emprestimo_pessoal',
           value: item.valor,
           meta: item.createdAt ? formatDate(item.createdAt) : '',
         }
       case 'dividas':
         return {
           name: `Devo p/ ${item.de || '?'}`,
-          emoji: '🤝',
+          catId: '_emprestimo_pessoal',
           value: item.valor,
           meta: item.createdAt ? formatDate(item.createdAt) : '',
         }
       case 'emprestimos-terceiros':
         return {
           name: `Emprestei p/ ${item.devedor || '?'}`,
-          emoji: '🏦',
+          catId: '_emprestimo_terceiros',
           value: item.valor,
           meta: item.data_emprestimo ? formatDate(item.data_emprestimo) : '',
           status: item.status,
@@ -291,13 +313,13 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       case 'dividas-terceiros':
         return {
           name: `Devo p/ ${item.credor || '?'}`,
-          emoji: '📝',
+          catId: '_dividas_terceiros',
           value: item.valor,
           meta: item.data_emprestimo ? formatDate(item.data_emprestimo) : '',
           status: item.status,
         }
       default:
-        return { name: 'Item', emoji: '📦', value: 0, meta: '' }
+        return { name: 'Item', catId: 'Outros', value: 0, meta: '' }
     }
   }
 
@@ -339,6 +361,14 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
             <label className={labelClass}>Pagamento</label>
             <select value={editData.payment_method || ''} onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })} className={inputClass}>
               {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Tipo de compra</label>
+            <select value={editData.pagamento_compartilhado || 'Pra mim'} onChange={(e) => setEditData({ ...editData, pagamento_compartilhado: e.target.value })} className={inputClass}>
+              <option value="Pra mim">Pra mim</option>
+              <option value="Dividido (me deve metade)">Dividido (me deve metade)</option>
+              <option value="Pra outra (me deve tudo)">Pra outra (me deve tudo)</option>
             </select>
           </div>
         </div>
@@ -434,11 +464,11 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Data Emprestimo</label>
-              <input type="date" value={editData.data_emprestimo ? new Date(editData.data_emprestimo).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_emprestimo: e.target.value })} className={inputClass} />
+              <input type="date" value={toLocalDateString(editData.data_emprestimo)} onChange={(e) => setEditData({ ...editData, data_emprestimo: e.target.value })} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Data Devolucao</label>
-              <input type="date" value={editData.data_devolucao ? new Date(editData.data_devolucao).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_devolucao: e.target.value })} className={inputClass} />
+              <input type="date" value={toLocalDateString(editData.data_devolucao)} onChange={(e) => setEditData({ ...editData, data_devolucao: e.target.value })} className={inputClass} />
             </div>
           </div>
         </div>
@@ -471,11 +501,11 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Data Emprestimo</label>
-              <input type="date" value={editData.data_emprestimo ? new Date(editData.data_emprestimo).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_emprestimo: e.target.value })} className={inputClass} />
+              <input type="date" value={toLocalDateString(editData.data_emprestimo)} onChange={(e) => setEditData({ ...editData, data_emprestimo: e.target.value })} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Data Pagamento</label>
-              <input type="date" value={editData.data_pagamento ? new Date(editData.data_pagamento).toISOString().split('T')[0] : ''} onChange={(e) => setEditData({ ...editData, data_pagamento: e.target.value })} className={inputClass} />
+              <input type="date" value={toLocalDateString(editData.data_pagamento)} onChange={(e) => setEditData({ ...editData, data_pagamento: e.target.value })} className={inputClass} />
             </div>
           </div>
           <div className="flex items-center gap-2 pt-1">
@@ -560,9 +590,10 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
               </button>
               {categoriasPresentes.map(cat => (
                 <button key={cat.id} onClick={() => { setFilters(f => ({ ...f, categoria: cat.id })); setOpenFilter(null) }}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
+                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10 flex items-center gap-2
                     ${filters.categoria === cat.id ? 'text-white bg-white/5' : 'text-white/70'}`}>
-                  {cat.emoji} {cat.label}
+                  <CategoryIcon category={cat.id} size={12} className="flex-shrink-0" />
+                  {cat.label}
                 </button>
               ))}
             </div>
@@ -620,7 +651,7 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
                 <button key={s.value} onClick={() => { setFilters(f => ({ ...f, status: s.value })); setOpenFilter(null) }}
                   className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
                     ${filters.status === s.value ? 'text-white bg-white/5' : 'text-white/70'}`}>
-                  {s.emoji} {s.label}
+                  {s.label}
                 </button>
               ))}
             </div>
@@ -695,14 +726,14 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
                   onClick={() => handleExpand(item)}
                   className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors"
                 >
-                  <span className="text-lg flex-shrink-0">{display.emoji}</span>
+                  <CategoryIcon category={display.catId} size={18} className="text-white/60 flex-shrink-0" />
                   <div className="flex-1 text-left min-w-0">
                     <p className="text-white text-sm font-medium truncate">{display.name}</p>
                     <div className="flex items-center gap-2">
                       <p className="text-white/40 text-xs truncate">{display.meta}</p>
                       {display.status && (
                         <Badge color={display.status === 'em aberto' ? 'coral' : 'mint'}>
-                          {display.status === 'em aberto' ? '🟡 Aberto' : '🟢 Quitado'}
+                          {display.status === 'em aberto' ? 'Aberto' : 'Quitado'}
                         </Badge>
                       )}
                     </div>
@@ -727,6 +758,15 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
                         <Save size={16} />
                         {saving ? 'Salvando...' : 'Salvar'}
                       </button>
+                      {item._tipo === 'contas-fixas' && (
+                        <button
+                          onClick={() => handleCancelarContaFixa(item)}
+                          className="px-4 py-2.5 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-colors flex items-center gap-2"
+                        >
+                          <Ban size={16} />
+                          Cancelar
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDelete(item)}
                         className="px-4 py-2.5 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors flex items-center gap-2"
@@ -743,7 +783,7 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
         </div>
       ) : (
         <EmptyState
-          icon="🔍"
+          icon={Search}
           message="Nenhum registro encontrado"
           sub={searchQuery ? 'Tente outro termo de busca' : activeFilterCount > 0 ? 'Tente remover alguns filtros' : null}
         />
@@ -752,7 +792,7 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 animate-slide-up z-50
-                         ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white`}>
+                         ${toast.type === 'success' ? 'bg-mint-500' : 'bg-coral-500'} text-white`}>
           {toast.type === 'success' ? <Check size={20} /> : <CircleAlert size={20} />}
           <span className="font-medium">{toast.message}</span>
         </div>

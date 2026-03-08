@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { SectionTitle, Skeleton } from '@/components/ui/Cards'
-import { fmt, formatDateFull, getCategoryEmoji, calcPeriodoFatura, CATEGORIAS } from '@/lib/helpers'
+import { SectionTitle, Skeleton, CategoryIcon } from '@/components/ui/Cards'
+import { fmt, formatDateFull, calcPeriodoFatura, CATEGORIAS } from '@/lib/helpers'
 import { ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, Shield, PiggyBank, CreditCard, ShoppingBag, Calendar, Flame, Landmark } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
@@ -30,24 +30,32 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     try {
       const [desp, cf, cfg, metasData, dividas] = await Promise.all([
         fetch(`/api/despesas?buyer=${user}`).then(r => r.json()),
-        fetch('/api/contas-fixas').then(r => r.json()),
+        fetch('/api/contas-fixas?all=true').then(r => r.json()),
         fetch(`/api/config?user=${user}`).then(r => r.json()),
         fetch(`/api/metas?user=${user}`).then(r => r.json()),
-        fetch(`/api/dividas-terceiros?user=${user}&status=em aberto`).then(r => r.json()),
+        fetch(`/api/dividas-terceiros?user=${user}&status=all`).then(r => r.json()),
       ])
 
       const periodoAtual = calcPeriodoFatura(cfg, user, mesesAtras)
       const periodoAnterior = calcPeriodoFatura(cfg, user, mesesAtras + 1)
       const periodoDoisAtras = calcPeriodoFatura(cfg, user, mesesAtras + 2)
 
+      const fixasDoUser = cf.filter(c => c.buyer === user || c.responsavel === user)
+      // Filtrar contas fixas ativas no período atual para exibição
+      const fixasVisiveis = fixasDoUser.filter(c => {
+        if (c.ativo !== false) return true
+        if (c.data_cancelamento) return new Date(c.data_cancelamento) > periodoAtual.dataInicio
+        return false
+      })
+
       setDespesas(desp)
-      setContasFixas(cf.filter(c => c.buyer === user || c.responsavel === user))
+      setContasFixas(fixasVisiveis)
       setConfig(cfg)
       setMetas(metasData)
       setDividasTerceiros(dividas)
       setPeriodos({ atual: periodoAtual, anterior: periodoAnterior, doisAtras: periodoDoisAtras })
 
-      calcularMetricas(desp, cf.filter(c => c.buyer === user || c.responsavel === user), metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras)
+      calcularMetricas(desp, fixasDoUser, metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras)
     } catch (error) {
       console.error('Erro ao carregar relatório:', error)
     } finally {
@@ -83,7 +91,22 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     return entries.length > 0 ? entries[0].limite : meta.limite
   }
 
+  // Filtra contas fixas que estavam ativas no período
+  // (ativa OU cancelada depois do início do período)
+  function filtrarFixasPeriodo(fixas, periodo) {
+    return fixas.filter(c => {
+      if (c.ativo !== false) return true
+      if (c.data_cancelamento) {
+        return new Date(c.data_cancelamento) > periodo.dataInicio
+      }
+      return false
+    })
+  }
+
   function calcularMetricas(allDespesas, fixas, metasData, dividas, periodoAtual, periodoAnterior, periodoDoisAtras) {
+    const fixasAtual = filtrarFixasPeriodo(fixas, periodoAtual)
+    const fixasAnterior = filtrarFixasPeriodo(fixas, periodoAnterior)
+
     const despAtual = filtrarDespesasPeriodo(allDespesas, periodoAtual)
     const despAnterior = filtrarDespesasPeriodo(allDespesas, periodoAnterior)
     const despDoisAtras = filtrarDespesasPeriodo(allDespesas, periodoDoisAtras)
@@ -107,8 +130,8 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     })
     const totalEconomia = economiaItems.reduce((sum, d) => sum + d.total_value, 0)
 
-    // Total fixas
-    const totalFixas = fixas.filter(c => !c.cartao_credito).reduce((sum, c) => sum + (c.valor || 0), 0)
+    // Total fixas (todas ativas no período, incluindo cartão)
+    const totalFixas = fixasAtual.reduce((sum, c) => sum + (c.valor || 0), 0)
     const totalMes = totalAtual + totalFixas
 
     // Métricas básicas
@@ -136,9 +159,9 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       if (d.tem_pendencia && d.valor_pendente) valor -= d.valor_pendente
       gastosPorCategoria[d.label] = (gastosPorCategoria[d.label] || 0) + valor
     })
-    // Incluir contas fixas nas categorias (são mensais, entram em todo período)
+    // Incluir contas fixas ativas no período nas categorias
     const catIds = new Set(CATEGORIAS.map(c => c.id))
-    fixas.forEach(c => {
+    fixasAtual.forEach(c => {
       const rawCat = c.categoria || 'Contas'
       const cat = catIds.has(rawCat) ? rawCat : 'Contas'
       gastosPorCategoria[cat] = (gastosPorCategoria[cat] || 0) + (c.valor || 0)
@@ -152,8 +175,8 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       if (d.tem_pendencia && d.valor_pendente) valor -= d.valor_pendente
       gastosPorCategoriaAnterior[d.label] = (gastosPorCategoriaAnterior[d.label] || 0) + valor
     })
-    // Contas fixas também no período anterior (são recorrentes)
-    fixas.forEach(c => {
+    // Contas fixas ativas no período anterior
+    fixasAnterior.forEach(c => {
       const rawCat = c.categoria || 'Contas'
       const cat = catIds.has(rawCat) ? rawCat : 'Contas'
       gastosPorCategoriaAnterior[cat] = (gastosPorCategoriaAnterior[cat] || 0) + (c.valor || 0)
@@ -185,7 +208,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     // Controle de cartão
     const comprasCreditoItems = despAtual.filter(d => d.payment_method === 'Credito' && d.installment <= 1)
     const comprasCredito = comprasCreditoItems.reduce((sum, d) => sum + d.total_value, 0)
-    const fixasCreditoItems = fixas.filter(c => c.cartao_credito)
+    const fixasCreditoItems = fixasAtual.filter(c => c.cartao_credito)
     const refDate = periodoAtual.dataInicio
     const parcelasAtivas = allDespesas.filter(d => {
       if (d.installment <= 1 || d.payment_method !== 'Credito') return false
@@ -194,7 +217,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       return meses < d.installment
     })
     const parcelasMes = parcelasAtivas.reduce((sum, d) => sum + (d.total_value / d.installment), 0)
-    const fixasCredito = fixas.filter(c => c.cartao_credito).reduce((sum, c) => sum + (c.valor || 0), 0)
+    const fixasCredito = fixasAtual.filter(c => c.cartao_credito).reduce((sum, c) => sum + (c.valor || 0), 0)
     // Próximo mês: só parcelas que ainda estarão ativas (meses + 1 < installment)
     const parcelasProxMes = parcelasAtivas.filter(d => {
       const dc = new Date(d.createdAt)
@@ -212,8 +235,8 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       if (d.installment > 1) valor = valor / d.installment
       gastosPorPagamento[d.payment_method] = (gastosPorPagamento[d.payment_method] || 0) + valor
     })
-    // Incluir contas fixas nos pagamentos
-    fixas.forEach(c => {
+    // Incluir contas fixas ativas no período nos pagamentos
+    fixasAtual.forEach(c => {
       const metodo = c.cartao_credito ? 'Credito' : 'Debito'
       gastosPorPagamento[metodo] = (gastosPorPagamento[metodo] || 0) + (c.valor || 0)
     })
@@ -264,12 +287,24 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       score += 12
     }
 
+    // Filtrar dívidas que estavam em aberto no período visualizado
+    // (criada antes do fim do período E ainda em aberto OU quitada depois do fim do período)
+    const dividasNoPeriodo = dividas.filter(d => {
+      const dataCriacao = new Date(d.data_emprestimo)
+      if (dataCriacao > periodoAtual.dataFim) return false
+      if (d.status === 'em aberto') return true
+      if (d.status === 'quitado' && d.data_quitacao) {
+        return new Date(d.data_quitacao) > periodoAtual.dataFim
+      }
+      return false
+    })
+
     // 4. Controle (0-25 pts)
     let controle = 25
     if (compromissoTotal > totalAtual * 0.5) controle -= 10
     else if (compromissoTotal > totalAtual * 0.3) controle -= 5
-    if (dividas.length > 3) controle -= 10
-    else if (dividas.length > 0) controle -= 5
+    if (dividasNoPeriodo.length > 3) controle -= 10
+    else if (dividasNoPeriodo.length > 0) controle -= 5
     score += Math.max(0, controle)
 
     score = Math.min(100, Math.max(0, score))
@@ -280,7 +315,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       metasDentro: metasComGasto.length > 0 ? metasComGasto.filter(m => m.isCofrinho ? m.percent >= 100 : m.percent <= 100).length : 0,
       metasTotal: metasComGasto.length,
       variacao,
-      dividas: dividas.length,
+      dividas: dividasNoPeriodo.length,
     }
 
     setMetricas({
@@ -467,7 +502,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
           <p className="text-white/40 text-[10px] mb-1">Total</p>
-          <p className="text-white font-bold text-sm">{fmt(metricas.totalAtual)}</p>
+          <p className="text-white font-bold text-sm">{fmt(metricas.totalMes)}</p>
         </div>
         <div className="bg-base-700/50 border border-white/5 rounded-2xl p-3 text-center">
           <p className="text-white/40 text-[10px] mb-1">Média/Dia</p>
@@ -542,7 +577,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
               return (
                 <div key={c.categoria} className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm">{catInfo?.emoji || '📦'}</span>
+                    <CategoryIcon category={catInfo?.id || 'Outros'} size={16} className="text-white/60" />
                     <span className="text-white text-xs font-medium truncate">{catInfo?.label || c.categoria}</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -576,7 +611,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                 <div key={m._id}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm">{catInfo?.emoji || '📦'}</span>
+                      <CategoryIcon category={catInfo?.id || 'Outros'} size={16} className="text-white/60" />
                       <span className="text-white text-xs font-medium truncate">{catInfo?.label || m.categoria}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -696,7 +731,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                 }`}>{idx + 1}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-xs font-medium truncate">
-                    {getCategoryEmoji(d.label)} {d.item}
+                    {d.item}
                   </p>
                   <p className="text-white/30 text-[10px] truncate">{formatDateFull(d.createdAt)} • {d.payment_method}</p>
                 </div>
@@ -744,7 +779,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
               <div className="space-y-1 ml-2">
                 {metricas.comprasCreditoItems?.map((d) => (
                   <div key={d._id} className="flex items-center justify-between">
-                    <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{getCategoryEmoji(d.label)} {d.item}</p>
+                    <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{d.item}</p>
                     <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(d.total_value)}</p>
                   </div>
                 ))}
@@ -762,7 +797,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                   const parcelaAtual = Math.min(meses + 1, d.installment)
                   return (
                     <div key={d._id} className="flex items-center justify-between">
-                      <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{getCategoryEmoji(d.label)} {d.item} ({parcelaAtual}/{d.installment})</p>
+                      <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{d.item} ({parcelaAtual}/{d.installment})</p>
                       <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(d.total_value / d.installment)}</p>
                     </div>
                   )
@@ -793,7 +828,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                   const meses = (ref.getFullYear() - dc.getFullYear()) * 12 + (ref.getMonth() - dc.getMonth())
                   return (
                     <div key={d._id} className="flex items-center justify-between">
-                      <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{getCategoryEmoji(d.label)} {d.item} ({meses + 2}/{d.installment})</p>
+                      <p className="text-white/30 text-[10px] truncate flex-1 min-w-0">{d.item} ({meses + 2}/{d.installment})</p>
                       <p className="text-white/40 text-[10px] flex-shrink-0 ml-2">{fmt(d.total_value / d.installment)}</p>
                     </div>
                   )
@@ -828,7 +863,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                 return (
                   <div key={d._id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03]">
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-xs font-medium truncate">{getCategoryEmoji(d.label)} {d.item}</p>
+                      <p className="text-white text-xs font-medium truncate">{d.item}</p>
                       <p className="text-white/30 text-[10px]">Total {fmt(d.total_value)} · {parcelaAtual}/{d.installment}</p>
                     </div>
                     <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(d.total_value / d.installment)}/mês</p>
@@ -899,7 +934,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
               {metricas.despesasPeriodo.map((d) => (
                 <div key={d._id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03]">
                   <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs font-medium truncate">{getCategoryEmoji(d.label)} {d.item}</p>
+                    <p className="text-white text-xs font-medium truncate">{d.item}</p>
                     <p className="text-white/30 text-[10px] truncate">{formatDateFull(d.createdAt)} • {d.payment_method}</p>
                   </div>
                   <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(d.total_value)}</p>

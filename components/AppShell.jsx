@@ -12,6 +12,8 @@ import MetasPage from '@/components/pages/MetasPage'
 import AmbasPage from '@/components/pages/AmbasPage'
 import EditarPage from '@/components/pages/EditarPage'
 import ConfigPage from '@/components/pages/ConfigPage'
+import ImportPage from '@/components/pages/ImportPage'
+import LugaresPage from '@/components/pages/LugaresPage'
 import { Menu } from 'lucide-react'
 import Image from 'next/image'
 
@@ -24,6 +26,8 @@ const PAGES = [
   { id: 'metas', icon: 'Target', label: 'Metas' },
   { id: 'ambas', icon: 'Users', label: 'Ambas' },
   { id: 'editar', icon: 'Pencil', label: 'Editar' },
+  { id: 'import', icon: 'Download', label: 'Importar' },
+  { id: 'lugares', icon: 'MapPin', label: 'Lugares' },
   { id: 'config', icon: 'Settings', label: 'Config' },
 ]
 
@@ -34,11 +38,13 @@ export default function AppShell({ user, onSwitchUser }) {
   const [editItemId, setEditItemId] = useState(null)
   const [acertoFocus, setAcertoFocus] = useState(null)
   const [periodo, setPeriodo] = useState({ dataInicio: null, dataFim: null })
+  const [pendentesCount, setPendentesCount] = useState(0)
   const colors = getUserColors(user)
   const outro = getOtherUser(user)
 
   useEffect(() => {
     loadPeriodo()
+    loadPendentes()
   }, [user, refreshKey])
 
   async function loadPeriodo() {
@@ -48,6 +54,20 @@ export default function AppShell({ user, onSwitchUser }) {
       setPeriodo(p)
     } catch (error) {
       console.error('Erro ao carregar período:', error)
+    }
+  }
+
+  async function loadPendentes() {
+    try {
+      const res = await fetch(`/api/pluggy/transacoes?user=${user}&status=pendente`)
+      if (res.ok) {
+        const data = await res.json()
+        setPendentesCount(Array.isArray(data) ? data.length : 0)
+      } else {
+        setPendentesCount(0)
+      }
+    } catch {
+      setPendentesCount(0)
     }
   }
 
@@ -81,6 +101,8 @@ export default function AppShell({ user, onSwitchUser }) {
       case 'metas': return <MetasPage {...props} />
       case 'ambas': return <AmbasPage {...props} />
       case 'editar': return <EditarPage {...props} editItemId={editItemId} clearEditItemId={() => setEditItemId(null)} />
+      case 'import': return <ImportPage {...props} />
+      case 'lugares': return <LugaresPage user={user} colors={colors} />
       case 'config': return <ConfigPage {...props} />
       default: return <HomePage {...props} openEditItem={openEditItem} />
     }
@@ -106,7 +128,7 @@ export default function AppShell({ user, onSwitchUser }) {
       <Sidebar pages={PAGES} activePage={activePage} onNavigate={handleNavigate}
                isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)}
                user={user} colors={colors} onSwitchUser={onSwitchUser}
-               periodo={periodo} />
+               periodo={periodo} pendentesCount={pendentesCount} />
       <main className="flex-1 min-h-screen lg:ml-[72px] relative z-10">
         <div className="sticky top-0 z-30 bg-base-900/80 backdrop-blur-md border-b border-white/5
                         px-4 py-3 flex items-center justify-between lg:hidden">
