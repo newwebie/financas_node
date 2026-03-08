@@ -8,7 +8,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Download, RefreshCw, Trash2, X, Check,
-  ChevronDown, ChevronUp, Building2, Calendar, Loader2, ArrowRight, AlertTriangle
+  ChevronDown, ChevronUp, Building2, Calendar, Loader2, ArrowRight, AlertTriangle,
+  CheckCircle2, Pencil, Zap, Bike, Car
 } from 'lucide-react'
 import { CATEGORIAS, PAYMENT_METHODS, fmt, formatDateFull, limparDescricao, extrairPagamento } from '@/lib/helpers'
 import { Skeleton, EmptyState } from '@/components/ui/Cards'
@@ -39,45 +40,65 @@ function TransacaoCard({ tx, isDuplicate, lugarNome, onLancar, onIgnorar }) {
 
   return (
     <div className={`rounded-xl border ${isDuplicate ? 'border-amber-500/30 bg-amber-500/[0.04]' : 'border-transparent'}`}>
-      <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-white/5 transition-colors group">
-        {/* Borda colorida lateral */}
-        <div className={`w-1 h-8 rounded-full shrink-0 ${isDebit ? 'bg-red-500/60' : 'bg-green-500/60'}`} />
+      <div className="py-2.5 px-3 rounded-xl hover:bg-white/5 transition-colors group">
+        <div className="flex items-center gap-3">
+          {/* Borda colorida lateral */}
+          <div className={`w-1 h-8 rounded-full shrink-0 ${isDebit ? 'bg-red-500/60' : 'bg-green-500/60'}`} />
 
-        {/* Descrição + categoria */}
-        <div className="flex-1 min-w-0">
-          <p className="text-white/90 text-sm truncate">{lugarNome || tx.receiverName || limparDescricao(tx.description) || 'Sem descrição'}</p>
-          <p className="text-white/35 text-xs truncate">
-            {cat?.label || tx.suggestedCategory || '—'}
-            {` · ${extrairPagamento(tx.paymentMethod, tx.description, tx.type)}`}
-            {tx.date && (() => {
-              const d = new Date(tx.date)
-              const day = String(d.getDate()).padStart(2, '0')
-              const mon = String(d.getMonth() + 1).padStart(2, '0')
-              const h = String(d.getHours()).padStart(2, '0')
-              const m = String(d.getMinutes()).padStart(2, '0')
-              return ` · ${day}/${mon} ${h}:${m}`
-            })()}
-          </p>
+          {/* Descrição + categoria */}
+          <div className="flex-1 min-w-0">
+            <p className="text-white/90 text-sm truncate">{lugarNome || tx.receiverName || limparDescricao(tx.description) || 'Sem descricao'}</p>
+            <p className="text-white/35 text-xs truncate">
+              {cat?.label || tx.suggestedCategory || '—'}
+              {` · ${extrairPagamento(tx.paymentMethod, tx.description, tx.type)}`}
+              {tx.date && (() => {
+                const d = new Date(tx.date)
+                const day = String(d.getDate()).padStart(2, '0')
+                const mon = String(d.getMonth() + 1).padStart(2, '0')
+                const h = String(d.getHours()).padStart(2, '0')
+                const m = String(d.getMinutes()).padStart(2, '0')
+                return ` · ${day}/${mon} ${h}:${m}`
+              })()}
+            </p>
+          </div>
+
+          {/* Valor */}
+          <span className={`text-sm font-semibold shrink-0 ${isDebit ? 'text-red-400' : 'text-green-400'}`}>
+            {isDebit ? '-' : '+'}{fmt(valor)}
+          </span>
+
+          {/* Ações - visíveis no desktop inline */}
+          <div className="hidden sm:flex gap-1 shrink-0">
+            <button
+              onClick={() => onLancar(tx)}
+              className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 text-xs font-medium transition-colors"
+            >
+              Lancar
+            </button>
+            <button
+              onClick={() => onIgnorar(tx)}
+              className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center transition-colors"
+            >
+              <X size={12} className="text-white/40" />
+            </button>
+          </div>
         </div>
 
-        {/* Valor */}
-        <span className={`text-sm font-semibold shrink-0 ${isDebit ? 'text-red-400' : 'text-green-400'}`}>
-          {isDebit ? '-' : '+'}{fmt(valor)}
-        </span>
-
-        {/* Ações */}
-        <div className="flex gap-1 shrink-0">
+        {/* Ações - linha separada só no mobile */}
+        <div className="flex sm:hidden items-center gap-2 mt-2 ml-4 pl-3">
           <button
             onClick={() => onLancar(tx)}
-            className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 text-xs font-medium transition-colors"
+            className="flex-1 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20
+                       text-white/70 text-xs font-medium transition-colors text-center"
           >
-            Lançar
+            Lancar
           </button>
           <button
             onClick={() => onIgnorar(tx)}
-            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center
+                       transition-colors shrink-0"
           >
-            <X size={12} className="text-white/40" />
+            <X size={13} className="text-white/40" />
           </button>
         </div>
       </div>
@@ -118,8 +139,8 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
   const mostrarUsoPessoal = !!tpl.pedir_uso_pessoal
   const mostrarCompartilhado = !!tpl.pedir_compartilhado
 
-  // Se é combustível (pedir_veiculo), o item final é o veículo
-  const isCombustivel = mostrarVeiculo
+  // É combustível se tem pedir_veiculo no template OU se a categoria é Combustivel
+  const isCombustivel = mostrarVeiculo || categoria === 'Combustivel' || lugarMatch?.categoria === 'Combustivel'
 
   async function handleSalvar() {
     const itemFinal = isCombustivel
@@ -209,7 +230,7 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
             autoFocus
             className="w-full px-4 py-3 rounded-xl bg-base-800 border border-white/10 text-white text-base
                        focus:border-white/30 outline-none placeholder-white/25 font-medium"
-            placeholder="Ex: Almoço, Combustível, Tênis..."
+            placeholder="Ex: Almoco, Combustivel, Tenis..."
           />
         </div>
       )}
@@ -233,21 +254,24 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
       )}
 
       {/* Veículo — para combustível */}
-      {mostrarVeiculo && (
+      {isCombustivel && (
         <div>
-          <label className="text-white/50 text-xs block mb-1.5">Veículo</label>
+          <label className="text-white/50 text-xs block mb-1.5">Veiculo</label>
           <div className="flex gap-2">
-            {['Moto', 'Carro'].map(v => (
+            {[
+              { id: 'Moto', icon: <Bike size={14} /> },
+              { id: 'Carro', icon: <Car size={14} /> },
+            ].map(v => (
               <button
-                key={v}
-                onClick={() => setVeiculo(v)}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors
-                  ${veiculo === v
+                key={v.id}
+                onClick={() => setVeiculo(v.id)}
+                className={`flex-1 py-3 rounded-xl text-sm font-medium border transition-colors flex items-center justify-center gap-1.5
+                  ${veiculo === v.id
                     ? 'bg-white/15 border-white/20 text-white'
                     : 'bg-transparent border-white/10 text-white/40 hover:text-white/60'
                   }`}
               >
-                {v === 'Moto' ? '🏍️' : '🚗'} {v}
+                {v.icon} {v.id}
               </button>
             ))}
           </div>
@@ -255,7 +279,7 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
       )}
 
       {/* Uso pessoal — para combustível */}
-      {mostrarUsoPessoal && (
+      {(isCombustivel || mostrarUsoPessoal) && (
         <button
           onClick={() => setUsoPessoal(!usoPessoal)}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors
@@ -268,7 +292,7 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
             ${usoPessoal ? 'bg-amber-500 border-amber-500' : 'border-white/20'}`}>
             {usoPessoal && <Check size={12} className="text-white" />}
           </div>
-          <span className="text-sm font-medium">Uso pessoal (não entra no relatório)</span>
+          <span className="text-sm font-medium">Uso pessoal (nao entra no relatorio)</span>
         </button>
       )}
 
@@ -408,7 +432,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
       const data = await res.json()
       if (data.ok) {
         const msg = data.atualizadas > 0
-          ? `${data.atualizadas} transaç${data.atualizadas === 1 ? 'ão atualizada' : 'ões atualizadas'}`
+          ? `${data.atualizadas} transac${data.atualizadas === 1 ? 'ao atualizada' : 'oes atualizadas'}`
           : 'Nada a atualizar'
         showToast(msg)
         if (data.atualizadas > 0) loadTransacoes()
@@ -430,7 +454,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
       })
       setTransacoes(prev => prev.filter(t => t._id !== tx._id))
     } catch {
-      showToast('Erro ao ignorar transação')
+      showToast('Erro ao ignorar transacao')
     } finally {
       setIgnorandoId(null)
     }
@@ -447,7 +471,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
     handleFecharModal()
     loadTransacoes()
     onRefresh && onRefresh()
-    showToast('Despesa lançada!')
+    showToast('Despesa lancada!')
   }
 
   const duplicatasAll = transacoes.filter(tx => tx.possivel_duplicata !== null && tx.possivel_duplicata !== undefined)
@@ -474,9 +498,9 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
   if (transacoes.length === 0) {
     return (
       <EmptyState
-        icon="✅"
-        message="Nenhuma transação pendente"
-        sub="Conecte seu banco pela aba Conexões ou importe extratos pela aba Upload"
+        icon={CheckCircle2}
+        message="Nenhuma transacao pendente"
+        sub="Conecte seu banco pela aba Conexoes ou importe extratos pela aba Upload"
       />
     )
   }
@@ -489,7 +513,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
     <div className="space-y-4">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-20 right-4 z-50 px-4 py-3 rounded-2xl bg-green-500 shadow-lg animate-slide-up">
+        <div className="fixed top-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-auto z-50 px-4 py-3 rounded-2xl bg-mint-500 shadow-lg animate-slide-up">
           <p className="text-white font-medium text-sm flex items-center gap-2">
             <Check size={16} />{toast}
           </p>
@@ -498,17 +522,19 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
 
       {/* Modal de lançamento */}
       {lancarTx && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={handleFecharModal}
           />
-          {/* Sheet */}
-          <div className="relative w-full max-w-md bg-base-900 border border-white/10 rounded-2xl p-5 space-y-4 animate-slide-up overflow-y-auto max-h-[90dvh]">
+          {/* Sheet - bottom sheet no mobile, centered modal no desktop */}
+          <div className="relative w-full sm:max-w-md bg-base-900 border border-white/10
+                          rounded-t-2xl sm:rounded-2xl p-4 sm:p-5 space-y-4 animate-slide-up
+                          overflow-y-auto max-h-[92dvh] sm:max-h-[90dvh]">
             {/* Header do modal */}
             <div className="flex items-start justify-between gap-3">
-              <p className="text-white font-semibold text-sm">Lançar despesa</p>
+              <p className="text-white font-semibold text-sm">Lancar despesa</p>
               <button
                 onClick={handleFecharModal}
                 className="text-white/30 hover:text-white/60 transition-colors shrink-0"
@@ -519,8 +545,8 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
 
             {/* Bloco da transação original */}
             <div className="bg-white/5 rounded-xl px-3 py-2.5">
-              <p className="text-white/40 text-xs mb-0.5">Transação original</p>
-              <p className="text-white/80 text-sm truncate">{lancarTx.description || 'Sem descrição'}</p>
+              <p className="text-white/40 text-xs mb-0.5">Transacao original</p>
+              <p className="text-white/80 text-sm truncate">{lancarTx.description || 'Sem descricao'}</p>
               <p className={`text-base font-bold ${lancarTx.type === 'DEBIT' ? 'text-red-400' : 'text-green-400'}`}>
                 {lancarTx.type === 'DEBIT' ? '-' : '+'}{fmt(Math.abs(lancarTx.amount))}
               </p>
@@ -548,16 +574,16 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
                     onClick={handleFecharModal}
                     className="text-white/40 text-xs hover:text-white/70 transition-colors underline underline-offset-2"
                   >
-                    Fechar sem lançar
+                    Fechar sem lancar
                   </button>
                 </div>
               ) : !criarLugar ? (
                 <button
                   onClick={() => setCriarLugar(true)}
-                  className="text-white/40 text-xs hover:text-white/70 transition-colors flex items-center gap-1.5"
+                  className="text-white/40 text-xs hover:text-white/70 transition-colors flex items-center gap-1.5 py-1"
                 >
                   {lugarExistente
-                    ? `✏️ Editar lugar "${lugarExistente.nome}"`
+                    ? <><Pencil size={11} /> Editar lugar &quot;{lugarExistente.nome}&quot;</>
                     : <><span className="text-base leading-none">+</span> Salvar como Lugar</>
                   }
                 </button>
@@ -572,7 +598,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
                     type="text"
                     value={lugarForm.nome}
                     onChange={e => setLugarForm(p => ({ ...p, nome: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl bg-base-800 border border-white/10 text-white text-sm focus:border-white/20 outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-base-800 border border-white/10 text-white text-sm focus:border-white/20 outline-none"
                     placeholder="Nome do lugar"
                   />
 
@@ -590,14 +616,14 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
                   {/* Tipo: manual / semi-auto / auto */}
                   <div className="flex gap-1.5">
                     {[
-                      { id: 'manual', label: 'Manual', icon: '✏️' },
-                      { id: 'semi-auto', label: 'Semi-auto', icon: '🔶' },
-                      { id: 'auto', label: 'Auto', icon: '⚡' },
+                      { id: 'manual', label: 'Manual', icon: <Pencil size={11} /> },
+                      { id: 'semi-auto', label: 'Semi', icon: <RefreshCw size={11} /> },
+                      { id: 'auto', label: 'Auto', icon: <Zap size={11} /> },
                     ].map(t => (
                       <button
                         key={t.id}
                         onClick={() => setLugarForm(p => ({ ...p, tipo: t.id }))}
-                        className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition-colors
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-medium border transition-colors flex items-center justify-center gap-1
                           ${lugarForm.tipo === t.id
                             ? 'bg-white/15 border-white/20 text-white'
                             : 'bg-transparent border-white/10 text-white/40 hover:text-white/60'
@@ -610,20 +636,20 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
 
                   {/* Dica de comportamento */}
                   <p className="text-white/25 text-[10px] px-1">
-                    {lugarForm.tipo === 'auto' && 'Lança sozinho, sem perguntar nada'}
-                    {lugarForm.tipo === 'semi-auto' && 'Reconhece e pre-preenche, mas pede confirmação'}
-                    {lugarForm.tipo === 'manual' && 'Vai pra fila sem sugestão'}
+                    {lugarForm.tipo === 'auto' && 'Lanca sozinho, sem perguntar nada'}
+                    {lugarForm.tipo === 'semi-auto' && 'Reconhece e pre-preenche, mas pede confirmacao'}
+                    {lugarForm.tipo === 'manual' && 'Vai pra fila sem sugestao'}
                   </p>
 
                   {/* Template — só aparece pra semi-auto */}
                   {lugarForm.tipo === 'semi-auto' && (
                     <div className="space-y-1.5">
-                      <p className="text-white/40 text-xs font-medium">Campos extras ao lançar:</p>
+                      <p className="text-white/40 text-xs font-medium">Campos extras ao lancar:</p>
                       {[
                         { key: 'pedir_item', label: 'Pedir nome do item (ex: Shopee)' },
-                        { key: 'pedir_veiculo', label: 'Pedir veículo (Moto/Carro)' },
+                        { key: 'pedir_veiculo', label: 'Pedir veiculo (Moto/Carro)' },
                         { key: 'pedir_uso_pessoal', label: 'Pedir uso pessoal' },
-                        { key: 'pedir_compartilhado', label: 'Pedir tipo de compra (dividido/pra outra)' },
+                        { key: 'pedir_compartilhado', label: 'Pedir tipo de compra' },
                       ].map(opt => (
                         <button
                           key={opt.key}
@@ -631,11 +657,11 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
                             ...p,
                             template: { ...p.template, [opt.key]: !p.template[opt.key] }
                           }))}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-colors text-left"
-                          style={{
-                            background: lugarForm.template[opt.key] ? 'rgba(255,255,255,0.08)' : 'transparent',
-                            borderColor: lugarForm.template[opt.key] ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
-                          }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-colors text-left
+                            ${lugarForm.template[opt.key]
+                              ? 'bg-white/[0.08] border-white/15'
+                              : 'bg-transparent border-white/5'
+                            }`}
                         >
                           <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors
                             ${lugarForm.template[opt.key] ? 'bg-white/80 border-white/80' : 'border-white/20'}`}>
@@ -703,7 +729,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
                       }
                     }}
                     disabled={salvandoLugar || !lugarForm.nome.trim()}
-                    className="w-full py-2 rounded-xl bg-white/10 border border-white/10 text-white/70 text-xs
+                    className="w-full py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/70 text-xs
                                font-medium hover:bg-white/15 transition-colors disabled:opacity-50"
                   >
                     {salvandoLugar ? 'Salvando...' : 'Salvar Lugar'}
@@ -716,31 +742,31 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
       )}
 
       {/* Header com chips de filtro e botão atualizar */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex items-center gap-2">
           {/* Chip Novas */}
           <button
             onClick={() => setSecao('novas')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all
+            className={`flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-all
               ${secao === 'novas'
                 ? 'bg-green-500/25 text-green-300 border border-green-500/40'
                 : 'bg-white/5 text-white/40 border border-white/10 hover:text-white/60'
               }`}
           >
-            ✅ {novas.length} nova{novas.length !== 1 ? 's' : ''}
+            <CheckCircle2 size={12} /> {novas.length} nova{novas.length !== 1 ? 's' : ''}
           </button>
 
-          {/* Chip Duplicatas — só exibe se houver duplicatas */}
+          {/* Chip Duplicatas */}
           {duplicatas.length > 0 && (
             <button
               onClick={() => setSecao('duplicatas')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all
+              className={`flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-all
                 ${secao === 'duplicatas'
                   ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
                   : 'bg-white/5 text-white/40 border border-white/10 hover:text-white/60'
                 }`}
             >
-              ⚠️ {duplicatas.length} duplicata{duplicatas.length !== 1 ? 's' : ''}
+              <AlertTriangle size={12} /> {duplicatas.length} duplicata{duplicatas.length !== 1 ? 's' : ''}
             </button>
           )}
         </div>
@@ -773,7 +799,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
         <div className="space-y-0.5">
           <p className="text-amber-400/70 text-xs font-medium px-1 pb-1 flex items-center gap-1.5">
             <AlertTriangle size={11} className="shrink-0" />
-            Possíveis duplicatas — confira antes de lançar
+            Possiveis duplicatas — confira antes de lancar
           </p>
           <div className="rounded-xl border border-amber-500/25 overflow-hidden bg-amber-500/[0.04] px-2 py-1 space-y-0.5">
             {duplicatas.map(tx => (
@@ -829,7 +855,7 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
 
       {/* Estado vazio para a seção ativa */}
       {secao === 'novas' && grupos.length === 0 && novas.length === 0 && (
-        <p className="text-white/30 text-xs text-center py-4">Nenhuma transação nova.</p>
+        <p className="text-white/30 text-xs text-center py-4">Nenhuma transacao nova.</p>
       )}
     </div>
   )
@@ -900,16 +926,16 @@ function ItemCard({ item, user, colors, onRemove }) {
   return (
     <div className="bg-white/[0.03] border border-white/5 rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
             <Building2 size={16} className="text-white/60" />
           </div>
-          <div>
-            <p className="text-white text-sm font-medium">{item.connectorName || 'Banco'}</p>
+          <div className="min-w-0">
+            <p className="text-white text-sm font-medium truncate">{item.connectorName || 'Banco'}</p>
             <p className="text-white/30 text-xs">Sync: {lastSync}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={toggleContas}
             className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center
@@ -925,7 +951,7 @@ function ItemCard({ item, user, colors, onRemove }) {
             disabled={removendo}
             className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center
                        hover:bg-red-500/20 transition-colors disabled:opacity-50"
-            title="Remover conexão"
+            title="Remover conexao"
           >
             {removendo ? <Loader2 size={13} className="text-white/40 animate-spin" /> : <Trash2 size={13} className="text-white/40" />}
           </button>
@@ -966,7 +992,7 @@ function ItemCard({ item, user, colors, onRemove }) {
                 </div>
                 <div>
                   <label className="text-white/50 text-xs block mb-1.5 flex items-center gap-1">
-                    <Calendar size={11} /> Até
+                    <Calendar size={11} /> Ate
                   </label>
                   <input
                     type="date"
@@ -985,12 +1011,12 @@ function ItemCard({ item, user, colors, onRemove }) {
                             bg-gradient-to-r ${colors.gradient} text-white hover:opacity-90 transition-opacity disabled:opacity-50`}
               >
                 {importing ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                {importing ? 'Importando...' : 'Importar transações'}
+                {importing ? 'Importando...' : 'Importar transacoes'}
               </button>
 
               {importResult && !importResult.error && (
                 <p className="text-green-400 text-xs text-center">
-                  {importResult.imported} importadas · {importResult.skipped} já existiam
+                  {importResult.imported} importadas · {importResult.skipped} ja existiam
                 </p>
               )}
               {importResult?.error && (
@@ -1046,9 +1072,9 @@ function TabConexoes({ user, colors }) {
 
       {items.length === 0 ? (
         <EmptyState
-          icon="🏦"
+          icon={Building2}
           message="Nenhum banco conectado"
-          sub="Conecte seu banco para importar transações automaticamente"
+          sub="Conecte seu banco para importar transacoes automaticamente"
         />
       ) : (
         <div className="space-y-3">
@@ -1076,90 +1102,6 @@ function TabUpload({ user, onImported }) {
   )
 }
 
-// ----- Helper: formata "2026-03" → "mar/26" -----
-function formatMes(mesAno) {
-  if (!mesAno) return ''
-  const [ano, mes] = mesAno.split('-')
-  const nomes = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
-  return `${nomes[parseInt(mes) - 1]}/${ano.slice(2)}`
-}
-
-// ----- Subcomponente: Aba Recorrentes -----
-function TabRecorrentes({ user }) {
-  const [recorrentes, setRecorrentes] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    if (loaded) return
-    setLoading(true)
-    fetch(`/api/pluggy/recorrentes?user=${user}`)
-      .then(r => r.json())
-      .then(data => {
-        setRecorrentes(Array.isArray(data?.recorrentes) ? data.recorrentes : [])
-        setLoaded(true)
-      })
-      .catch(() => {
-        setRecorrentes([])
-        setLoaded(true)
-      })
-      .finally(() => setLoading(false))
-  }, [user, loaded])
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-white text-base font-semibold">Gastos Recorrentes</h2>
-        <p className="text-white/40 text-xs mt-0.5">Padrões detectados nos últimos 4 meses</p>
-      </div>
-
-      {loading && (
-        <div className="space-y-3">
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
-        </div>
-      )}
-
-      {!loading && recorrentes !== null && recorrentes.length === 0 && (
-        <EmptyState
-          icon="🔄"
-          message="Nenhum padrão detectado ainda"
-          sub="Importe mais transações para análise."
-        />
-      )}
-
-      {!loading && recorrentes !== null && recorrentes.length > 0 && (
-        <div className="space-y-2">
-          {recorrentes.map((rec, idx) => (
-            <div
-              key={idx}
-              className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors"
-            >
-              <div className="flex-shrink-0">
-                <RefreshCw size={14} className="text-white/40" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">{rec.descricao}</p>
-                <p className="text-white/40 text-xs mt-0.5">Último: {formatMes(rec.ultimoMes)}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <span className="text-white text-sm font-semibold">{fmt(rec.valorMedio)}</span>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full
-                  ${rec.totalMeses >= 4
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-amber-500/20 text-amber-400'
-                  }`}>
-                  {rec.totalMeses} {rec.totalMeses === 1 ? 'mês' : 'meses seguidos'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ----- Componente principal -----
 export default function ImportPage({ user, outro, colors, triggerRefresh }) {
@@ -1174,12 +1116,10 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
   }, [user])
 
   function handleUploadSuccess() {
-    // Atualiza badge de pendentes
     fetch(`/api/pluggy/transacoes?user=${user}&status=pendente`)
       .then(r => r.json())
       .then(data => setPendentesCount(Array.isArray(data) ? data.length : 0))
       .catch(() => {})
-    // Muda para aba de pendentes
     setActiveTab('pendentes')
   }
 
@@ -1197,9 +1137,8 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
       label: 'Pendentes',
       badge: pendentesCount > 0 ? pendentesCount : null,
     },
-    { id: 'conexoes', label: 'Conexões' },
+    { id: 'conexoes', label: 'Conexoes' },
     { id: 'upload', label: 'Upload' },
-    { id: 'recorrentes', label: 'Recorrentes' },
   ]
 
   return (
@@ -1207,12 +1146,12 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} bg-opacity-20
-                         flex items-center justify-center`}>
+                         flex items-center justify-center shrink-0`}>
           <Download size={20} className="text-white" />
         </div>
         <div>
           <h1 className="text-xl font-semibold text-white flex items-center gap-2">
-            Importar Transações
+            Importar Transacoes
             {pendentesCount > 0 && (
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold
                                 bg-gradient-to-r ${colors.gradient} text-white`}>
@@ -1224,7 +1163,7 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - scroll horizontal no mobile */}
       <div className="flex gap-1 bg-white/5 rounded-2xl p-1">
         {tabs.map(tab => (
           <button
@@ -1258,9 +1197,6 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
         )}
         {activeTab === 'upload' && (
           <TabUpload user={user} onImported={handleUploadSuccess} />
-        )}
-        {activeTab === 'recorrentes' && (
-          <TabRecorrentes user={user} />
         )}
       </div>
     </div>

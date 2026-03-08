@@ -9,7 +9,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Plus, Pencil, X, Check, MapPin, Loader2, RefreshCw, ChevronDown, ChevronUp, Lightbulb, Zap, Search } from 'lucide-react'
 import { CATEGORIAS, limparDescricao, fmt, formatDateFull } from '@/lib/helpers'
-import { Skeleton, EmptyState } from '@/components/ui/Cards'
+import { Skeleton, EmptyState, CategoryIcon } from '@/components/ui/Cards'
 
 const SELECT_CLASS = `w-full px-4 py-3 rounded-2xl bg-base-800 border border-white/10 text-white
   focus:border-white/20 outline-none transition-all cursor-pointer appearance-none
@@ -540,6 +540,7 @@ export default function LugaresManager({ user, colors }) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
+                      <CategoryIcon category={lugar.categoria} size={14} className="text-white/40 flex-shrink-0" />
                       <p className="text-white text-sm font-medium truncate">{lugar.nome}</p>
                       <span className={`text-xs px-1.5 py-0.5 rounded-md flex-shrink-0 flex items-center gap-1 ${
                         lugar.tipo === 'auto'
@@ -548,26 +549,8 @@ export default function LugaresManager({ user, colors }) {
                       }`}>
                         {lugar.tipo === 'auto' ? <><Zap size={10} /> Auto</> : <><Pencil size={10} /> Manual</>}
                       </span>
-                      <span className="text-white/30 text-xs flex-shrink-0">{catLabel(lugar.categoria)}</span>
                     </div>
 
-                    {lugar.keywords?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {lugar.keywords.map(kw => (
-                          <span
-                            key={kw}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full bg-white/[0.06]
-                                       text-white/40 text-[11px] border border-white/[0.06]"
-                          >
-                            {kw}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {lugar.totalVisitas > 0 && (
-                      <p className="text-white/25 text-xs mt-1.5">{lugar.totalVisitas} visita{lugar.totalVisitas !== 1 ? 's' : ''}</p>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-1 flex-shrink-0">
