@@ -54,7 +54,7 @@ export default function PluggyConnect({ user, onSuccess }) {
 
       let PluggyConnectClass
       try {
-        const mod = await import(/* webpackIgnore: true */ 'pluggy-connect-sdk/dist/main')
+        const mod = await import('pluggy-connect-sdk/dist/main')
         PluggyConnectClass = mod.PluggyConnect || mod.default?.PluggyConnect || mod.default
       } catch (importErr) {
         console.error('Pluggy SDK import error:', importErr)
