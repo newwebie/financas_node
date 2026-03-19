@@ -45,12 +45,19 @@ export default function PluggyConnect({ user, onSuccess }) {
 
       const { accessToken } = await tokenRes.json()
 
-      // 2. Importação dinâmica do SDK (vanilla JS, não React)
+      // 2. Importação dinâmica do SDK (vanilla JS, precisa de window/document)
+      if (typeof window === 'undefined') {
+        setWidgetUnavailable(true)
+        setStatus('idle')
+        return
+      }
+
       let PluggyConnectClass
       try {
-        const mod = await import('pluggy-connect-sdk/dist/main')
-        PluggyConnectClass = mod.PluggyConnect
-      } catch {
+        const mod = await import(/* webpackIgnore: true */ 'pluggy-connect-sdk/dist/main')
+        PluggyConnectClass = mod.PluggyConnect || mod.default?.PluggyConnect || mod.default
+      } catch (importErr) {
+        console.error('Pluggy SDK import error:', importErr)
         setWidgetUnavailable(true)
         setStatus('idle')
         return

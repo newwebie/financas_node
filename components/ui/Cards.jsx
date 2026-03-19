@@ -129,12 +129,13 @@ export function CardSkeleton() {
   )
 }
 
-// Estado vazio - icon aceita componente Lucide ou string
+// Estado vazio - icon aceita componente Lucide (function ou forwardRef) ou string/emoji
 export function EmptyState({ icon: Icon, message = 'Nenhum dado encontrado', sub }) {
+  const isComponent = typeof Icon === 'function' || (Icon && Icon.$$typeof)
   return (
     <div className="text-center py-16">
       {Icon && (
-        typeof Icon === 'function'
+        isComponent
           ? <Icon size={48} className="text-white/20 mx-auto mb-4" />
           : <span className="text-5xl block mb-4">{Icon}</span>
       )}

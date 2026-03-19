@@ -1,3 +1,5 @@
+export const maxDuration = 60 // segundos (requer Vercel Pro para >10s)
+
 import { NextResponse } from 'next/server'
 import { getCollections } from '@/lib/mongodb'
 import { getPluggyClient } from '@/lib/pluggy'
@@ -19,6 +21,11 @@ export async function GET(request) {
     const colls = await getCollections()
     const client = getPluggyClient()
 
+    // Webhook URL para receber notificações quando o item terminar de atualizar
+    const webhookUrl = process.env.NEXT_PUBLIC_APP_URL
+      ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/pluggy/webhook`
+      : null
+
     // Buscar itens ativos + itens com ERROR antigo (>12h) para retry automático
     const retryThreshold = new Date(Date.now() - 12 * 60 * 60 * 1000)
     const items = await colls.pluggy_items.find({
@@ -34,6 +41,31 @@ export async function GET(request) {
     for (const item of items) {
       try {
         const { itemId, userId } = item
+
+        // 0. Pedir ao Pluggy para re-sincronizar dados do banco
+        // ESSENCIAL: sem updateItem, fetchTransactions retorna dados stale
+        let itemReady = false
+        try {
+          // updateItem(id, parameters?, options?) — parameters=undefined usa credenciais salvas
+          const updateOptions = webhookUrl ? { webhookUrl } : undefined
+          await client.updateItem(itemId, undefined, updateOptions)
+
+          // Polling: esperar o item atualizar (max 45s para caber no timeout da Vercel)
+          const maxWait = 45000
+          const pollInterval = 5000
+          const start = Date.now()
+          while (Date.now() - start < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, pollInterval))
+            const updatedItem = await client.fetchItem(itemId)
+            const st = updatedItem.status
+            if (st === 'UPDATED') { itemReady = true; break }
+            if (st === 'LOGIN_ERROR' || st === 'OUTDATED') break
+            if (st === 'WAITING_USER_INPUT' || st === 'WAITING_USER_ACTION') break
+          }
+        } catch (updateErr) {
+          // Se item já está em UPDATING, ou erro transitório, tentar buscar dados mesmo assim
+          console.warn(`updateItem warning for ${itemId}:`, updateErr.message)
+        }
 
         // 1. Atualizar saldos das contas
         const accountsResult = await client.fetchAccounts(itemId)
@@ -99,7 +131,10 @@ export async function GET(request) {
           { $set: { lastSync: new Date(), status: 'UPDATED' } }
         )
 
-        results.push({ itemId, userId, accounts: accounts.length, imported, status: 'ok' })
+        results.push({
+          itemId, userId, accounts: accounts.length, imported,
+          itemReady, status: 'ok'
+        })
       } catch (itemError) {
         console.error(`Sync error for item ${item.itemId}:`, itemError)
         results.push({ itemId: item.itemId, status: 'error', error: itemError.message })
