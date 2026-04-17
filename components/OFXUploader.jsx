@@ -22,8 +22,8 @@ export default function OFXUploader({ user, onImported }) {
     if (!file) return
 
     const ext = file.name.split('.').pop().toLowerCase()
-    if (ext !== 'ofx' && ext !== 'csv') {
-      setError('Formato inválido. Use arquivos .ofx ou .csv')
+    if (ext !== 'ofx' && ext !== 'csv' && ext !== 'pdf') {
+      setError('Formato inválido. Use arquivos .pdf, .ofx ou .csv')
       return
     }
 
@@ -31,7 +31,8 @@ export default function OFXUploader({ user, onImported }) {
     setError(null)
     setResult(null)
 
-    const endpoint = ext === 'ofx' ? '/api/import/ofx' : '/api/import/csv'
+    const endpoints = { ofx: '/api/import/ofx', csv: '/api/import/csv', pdf: '/api/import/pdf' }
+    const endpoint = endpoints[ext]
     const formData = new FormData()
     formData.append('file', file)
     formData.append('userId', user)
@@ -102,7 +103,7 @@ export default function OFXUploader({ user, onImported }) {
             <Upload size={32} className="text-white/30" />
             <div>
               <p className="text-white/70 text-sm font-medium">
-                Arraste um arquivo .ofx ou .csv aqui
+                Arraste um arquivo .pdf, .ofx ou .csv aqui
               </p>
               <p className="text-white/30 text-xs mt-1">ou use o botão abaixo</p>
             </div>
@@ -119,7 +120,7 @@ export default function OFXUploader({ user, onImported }) {
         <input
           ref={inputRef}
           type="file"
-          accept=".ofx,.csv"
+          accept=".pdf,.ofx,.csv"
           className="hidden"
           onChange={handleFileChange}
         />
@@ -169,6 +170,11 @@ export default function OFXUploader({ user, onImported }) {
 
         {guiaOpen && (
           <div className="px-4 pb-4 space-y-3 border-t border-white/5">
+            <BancoGuia
+              banco="Santander (PDF)"
+              color="bg-red-600"
+              passos={['Acesse o Internet Banking', 'Vá em Extrato de Conta Corrente', 'Escolha o período', 'Clique em Imprimir / Salvar PDF']}
+            />
             <BancoGuia
               banco="Nubank"
               color="bg-purple-500"

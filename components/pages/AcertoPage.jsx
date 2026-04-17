@@ -159,6 +159,39 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
     }
   }
 
+  async function handleMarcarItemPago(item, tipo) {
+    let de, para, valor, itemQuitado
+
+    if (tipo === 'despesa') {
+      de = item.devedor === user ? user : outro
+      para = item.devedor === user ? outro : user
+      valor = item.valor_pendente
+      itemQuitado = { tipo: 'despesa', id: item._id, descricao: item.item || item.label, categoria: item.label, valor: item.valor_pendente, devedor: item.devedor }
+    } else {
+      de = item.de === user ? outro : user
+      para = item.de === user ? user : outro
+      valor = item.valor
+      itemQuitado = { tipo: 'emprestimo', id: item._id, descricao: item.descricao || 'Empréstimo', valor: item.valor, de: item.de, para: item.para }
+    }
+
+    try {
+      const res = await fetch('/api/acerto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ de, para, valor, itens_quitados: [itemQuitado] }),
+      })
+      if (res.ok) {
+        showFeedback('Item marcado como pago!')
+        loadData()
+        triggerRefresh()
+      } else {
+        showFeedback('Erro ao marcar como pago', true)
+      }
+    } catch {
+      showFeedback('Erro ao marcar como pago', true)
+    }
+  }
+
   async function handleExcluirTerceiro(id, endpoint, nome) {
     if (!confirm(`Excluir "${nome}"?`)) return
     try {
@@ -396,9 +429,18 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                           {d.devedor === user ? 'Voce deve' : `${outro} deve`}
                         </p>
                       </div>
-                      <p className={`text-lg font-bold ${d.devedor === user ? 'text-coral-400' : 'text-mint-400'}`}>
-                        {fmt(d.valor_pendente)}
-                      </p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <p className={`text-lg font-bold ${d.devedor === user ? 'text-coral-400' : 'text-mint-400'}`}>
+                          {fmt(d.valor_pendente)}
+                        </p>
+                        <button
+                          onClick={() => handleMarcarItemPago(d, 'despesa')}
+                          className="w-7 h-7 rounded-full bg-mint-500/20 border border-mint-400/30 flex items-center justify-center hover:bg-mint-500/40 active:scale-95 transition-all"
+                          title="Marcar como pago"
+                        >
+                          <Check size={12} className="text-mint-400" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -415,9 +457,18 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                           {e.de === user ? `${outro} deve` : 'Voce deve'}
                         </p>
                       </div>
-                      <p className={`text-lg font-bold ${e.de === user ? 'text-mint-400' : 'text-coral-400'}`}>
-                        {fmt(e.valor)}
-                      </p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <p className={`text-lg font-bold ${e.de === user ? 'text-mint-400' : 'text-coral-400'}`}>
+                          {fmt(e.valor)}
+                        </p>
+                        <button
+                          onClick={() => handleMarcarItemPago(e, 'emprestimo')}
+                          className="w-7 h-7 rounded-full bg-mint-500/20 border border-mint-400/30 flex items-center justify-center hover:bg-mint-500/40 active:scale-95 transition-all"
+                          title="Marcar como pago"
+                        >
+                          <Check size={12} className="text-mint-400" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

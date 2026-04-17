@@ -1,4 +1,4 @@
-export const maxDuration = 60 // segundos (requer Vercel Pro para >10s)
+export const maxDuration = 30
 
 import { NextResponse } from 'next/server'
 import { getCollections } from '@/lib/mongodb'
@@ -42,30 +42,15 @@ export async function GET(request) {
       try {
         const { itemId, userId } = item
 
-        // 0. Pedir ao Pluggy para re-sincronizar dados do banco
-        // ESSENCIAL: sem updateItem, fetchTransactions retorna dados stale
-        let itemReady = false
+        // Disparar updateItem sem esperar (fire & forget) — o webhook notifica quando terminar.
+        // Polling bloqueante de 45s causava timeout nas funções serverless.
         try {
-          // updateItem(id, parameters?, options?) — parameters=undefined usa credenciais salvas
           const updateOptions = webhookUrl ? { webhookUrl } : undefined
           await client.updateItem(itemId, undefined, updateOptions)
-
-          // Polling: esperar o item atualizar (max 45s para caber no timeout da Vercel)
-          const maxWait = 45000
-          const pollInterval = 5000
-          const start = Date.now()
-          while (Date.now() - start < maxWait) {
-            await new Promise(resolve => setTimeout(resolve, pollInterval))
-            const updatedItem = await client.fetchItem(itemId)
-            const st = updatedItem.status
-            if (st === 'UPDATED') { itemReady = true; break }
-            if (st === 'LOGIN_ERROR' || st === 'OUTDATED') break
-            if (st === 'WAITING_USER_INPUT' || st === 'WAITING_USER_ACTION') break
-          }
         } catch (updateErr) {
-          // Se item já está em UPDATING, ou erro transitório, tentar buscar dados mesmo assim
           console.warn(`updateItem warning for ${itemId}:`, updateErr.message)
         }
+        const itemReady = false // dado "stale" pode ser ligeiramente antigo — tudo bem
 
         // 1. Atualizar saldos das contas
         const accountsResult = await client.fetchAccounts(itemId)

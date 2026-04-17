@@ -426,6 +426,9 @@ export default function LugaresManager({ user, colors }) {
                     placeholder={keywords.length === 0 ? 'shell, posto, gasolina...' : ''}
                   />
                 </div>
+                <p className="text-white/25 text-[11px] mt-1.5 leading-relaxed">
+                  Use <span className="text-white/40 font-mono">*</span> no final para prefixo — ex: <span className="text-white/40 font-mono">juros saldo utiliz ate limite*</span> bate em qualquer descrição que comece com esse texto.
+                </p>
               </div>
 
               <div>

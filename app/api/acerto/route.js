@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCollections } from '@/lib/mongodb'
+import { ObjectId } from 'mongodb'
 
 export async function GET() {
   try {
@@ -28,9 +29,37 @@ export async function POST(request) {
       para: body.para, valor: body.valor, itens_quitados: body.itens_quitados,
     })
     const now = new Date()
-    await colls.despesas.updateMany({ status_pendencia: 'em aberto' }, { $set: { status_pendencia: 'quitado', data_quitacao: now } })
-    await colls.emprestimos.updateMany({ status: 'em aberto' }, { $set: { status: 'quitado', data_quitacao: now } })
-    await colls.quitacoes.updateMany({ status: 'em aberto', tipo: 'despesa_compartilhada' }, { $set: { status: 'quitado', data_quitacao: now } })
+
+    if (body.itens_quitados?.length > 0) {
+      const despesaIds = body.itens_quitados
+        .filter(i => i.tipo === 'despesa')
+        .map(i => new ObjectId(i.id))
+      const emprestimoIds = body.itens_quitados
+        .filter(i => i.tipo === 'emprestimo')
+        .map(i => new ObjectId(i.id))
+
+      if (despesaIds.length > 0) {
+        await colls.despesas.updateMany(
+          { _id: { $in: despesaIds } },
+          { $set: { status_pendencia: 'quitado', data_quitacao: now } }
+        )
+        await colls.quitacoes.updateMany(
+          { despesa_id: { $in: despesaIds }, status: 'em aberto', tipo: 'despesa_compartilhada' },
+          { $set: { status: 'quitado', data_quitacao: now } }
+        )
+      }
+      if (emprestimoIds.length > 0) {
+        await colls.emprestimos.updateMany(
+          { _id: { $in: emprestimoIds } },
+          { $set: { status: 'quitado', data_quitacao: now } }
+        )
+      }
+    } else {
+      await colls.despesas.updateMany({ status_pendencia: 'em aberto' }, { $set: { status_pendencia: 'quitado', data_quitacao: now } })
+      await colls.emprestimos.updateMany({ status: 'em aberto' }, { $set: { status: 'quitado', data_quitacao: now } })
+      await colls.quitacoes.updateMany({ status: 'em aberto', tipo: 'despesa_compartilhada' }, { $set: { status: 'quitado', data_quitacao: now } })
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

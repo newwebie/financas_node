@@ -1,20 +1,14 @@
 'use client'
 
-/**
- * Página: Importar Transações
- * Descrição: 3 abas — Pendentes, Conexões (Pluggy) e Upload (OFX/CSV).
- */
-
 import { useState, useEffect, useCallback } from 'react'
 import {
   Download, RefreshCw, Trash2, X, Check,
-  ChevronDown, ChevronUp, Building2, Calendar, Loader2, ArrowRight, AlertTriangle,
+  Loader2, ArrowRight, AlertTriangle,
   CheckCircle2, Pencil, Zap, Bike, Car
 } from 'lucide-react'
 import { CATEGORIAS, PAYMENT_METHODS, fmt, formatDateFull, limparDescricao, extrairPagamento } from '@/lib/helpers'
 import { Skeleton, EmptyState } from '@/components/ui/Cards'
 import OFXUploader from '@/components/OFXUploader'
-import PluggyConnect from '@/components/PluggyConnect'
 
 const SELECT_CLASS = `w-full px-4 py-3 rounded-2xl bg-base-800 border border-white/10 text-white text-sm
   focus:border-white/20 outline-none transition-all cursor-pointer appearance-none
@@ -399,19 +393,6 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
     setCriarLugar(false)
     setLugarSalvo(false)
   }
-
-  const [syncing, setSyncing] = useState(false)
-
-  // Sincroniza com o banco (Pluggy) e depois recarrega pendentes
-  const syncAndLoad = useCallback(async () => {
-    setSyncing(true)
-    try {
-      await fetch('/api/pluggy/sync').catch(() => {})
-    } finally {
-      setSyncing(false)
-    }
-    await loadTransacoes()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTransacoes = useCallback(async () => {
     setLoading(true)
@@ -798,12 +779,11 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
             {rematchLoading ? 'Processando...' : 'Re-match'}
           </button>
           <button
-            onClick={syncAndLoad}
-            disabled={syncing}
-            className="flex items-center gap-1.5 text-white/40 text-xs hover:text-white/70 transition-colors disabled:opacity-50"
+            onClick={loadTransacoes}
+            className="flex items-center gap-1.5 text-white/40 text-xs hover:text-white/70 transition-colors"
           >
-            {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            {syncing ? 'Sincronizando...' : 'Atualizar'}
+            <RefreshCw size={12} />
+            Atualizar
           </button>
         </div>
       </div>
@@ -875,238 +855,6 @@ function TabPendentes({ user, outro, colors, onRefresh }) {
   )
 }
 
-// ----- Subcomponente: Card de conexão (item Pluggy) -----
-function ItemCard({ item, user, colors, onRemove }) {
-  const [contas, setContas] = useState([])
-  const [loadingContas, setLoadingContas] = useState(false)
-  const [contaExpanded, setContaExpanded] = useState(false)
-  const [selectedConta, setSelectedConta] = useState('')
-  const [from, setFrom] = useState(getDateDaysAgo(30))
-  const [to, setTo] = useState(getLocalDate())
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState(null)
-  const [removendo, setRemovendo] = useState(false)
-
-  async function toggleContas() {
-    if (contaExpanded) { setContaExpanded(false); return }
-
-    setContaExpanded(true)
-    if (contas.length > 0) return
-
-    setLoadingContas(true)
-    try {
-      const data = await fetch(`/api/pluggy/contas?itemId=${item.itemId}`).then(r => r.json())
-      const lista = Array.isArray(data) ? data : []
-      setContas(lista)
-      if (lista.length > 0) setSelectedConta(lista[0].id)
-    } catch {
-      setContas([])
-    } finally {
-      setLoadingContas(false)
-    }
-  }
-
-  async function handleImportar() {
-    if (!selectedConta) return
-    setImporting(true)
-    setImportResult(null)
-    try {
-      const res = await fetch('/api/pluggy/transacoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user, accountId: selectedConta, from, to }),
-      })
-      const data = await res.json()
-      setImportResult(data)
-    } catch {
-      setImportResult({ error: 'Erro ao importar' })
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  async function handleRemove() {
-    setRemovendo(true)
-    try {
-      await fetch(`/api/pluggy/items?itemId=${item.itemId}`, { method: 'DELETE' })
-      onRemove(item.itemId)
-    } catch {
-      setRemovendo(false)
-    }
-  }
-
-  const lastSync = item.lastSync ? formatDateFull(new Date(item.lastSync)) : 'nunca'
-
-  return (
-    <div className="bg-white/[0.03] border border-white/5 rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
-            <Building2 size={16} className="text-white/60" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-white text-sm font-medium truncate">{item.connectorName || 'Banco'}</p>
-            <p className="text-white/30 text-xs">Sync: {lastSync}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={toggleContas}
-            className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center
-                       hover:bg-white/10 transition-colors"
-          >
-            {contaExpanded
-              ? <ChevronUp size={14} className="text-white/40" />
-              : <ChevronDown size={14} className="text-white/40" />
-            }
-          </button>
-          <button
-            onClick={handleRemove}
-            disabled={removendo}
-            className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center
-                       hover:bg-red-500/20 transition-colors disabled:opacity-50"
-            title="Remover conexao"
-          >
-            {removendo ? <Loader2 size={13} className="text-white/40 animate-spin" /> : <Trash2 size={13} className="text-white/40" />}
-          </button>
-        </div>
-      </div>
-
-      {contaExpanded && (
-        <div className="border-t border-white/5 p-4 space-y-3">
-          {loadingContas ? (
-            <Skeleton className="h-12" />
-          ) : contas.length === 0 ? (
-            <p className="text-white/30 text-xs text-center py-2">Nenhuma conta encontrada</p>
-          ) : (
-            <>
-              <div>
-                <label className="text-white/50 text-xs block mb-1.5">Conta</label>
-                <select value={selectedConta} onChange={e => setSelectedConta(e.target.value)} className={SELECT_CLASS}>
-                  {contas.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.number ? `(${c.number})` : ''} — {fmt(c.balance || 0)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-white/50 text-xs block mb-1.5 flex items-center gap-1">
-                    <Calendar size={11} /> De
-                  </label>
-                  <input
-                    type="date"
-                    value={from}
-                    onChange={e => setFrom(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-base-800 border border-white/10 text-white text-sm
-                               focus:border-white/20 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-white/50 text-xs block mb-1.5 flex items-center gap-1">
-                    <Calendar size={11} /> Ate
-                  </label>
-                  <input
-                    type="date"
-                    value={to}
-                    onChange={e => setTo(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-base-800 border border-white/10 text-white text-sm
-                               focus:border-white/20 outline-none"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={handleImportar}
-                disabled={importing}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium
-                            bg-gradient-to-r ${colors.gradient} text-white hover:opacity-90 transition-opacity disabled:opacity-50`}
-              >
-                {importing ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                {importing ? 'Importando...' : 'Importar transacoes'}
-              </button>
-
-              {importResult && !importResult.error && (
-                <p className="text-green-400 text-xs text-center">
-                  {importResult.imported} importadas · {importResult.skipped} ja existiam
-                </p>
-              )}
-              {importResult?.error && (
-                <p className="text-red-400 text-xs text-center">{importResult.error}</p>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ----- Subcomponente: Aba Conexões -----
-function TabConexoes({ user, colors }) {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const loadItems = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await fetch(`/api/pluggy/items?user=${user}`).then(r => r.json())
-      setItems(Array.isArray(data) ? data : [])
-    } catch {
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
-
-  useEffect(() => { loadItems() }, [loadItems])
-
-  function handleRemove(itemId) {
-    setItems(prev => prev.filter(i => i.itemId !== itemId))
-  }
-
-  function handleConnectSuccess() {
-    loadItems()
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      <PluggyConnect user={user} onSuccess={handleConnectSuccess} />
-
-      {items.length === 0 ? (
-        <EmptyState
-          icon={Building2}
-          message="Nenhum banco conectado"
-          sub="Conecte seu banco para importar transacoes automaticamente"
-        />
-      ) : (
-        <div className="space-y-3">
-          {items.map(item => (
-            <ItemCard
-              key={item.itemId}
-              item={item}
-              user={user}
-              colors={colors}
-              onRemove={handleRemove}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ----- Subcomponente: Aba Upload -----
 function TabUpload({ user, onImported }) {
   return (
@@ -1151,7 +899,6 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
       label: 'Pendentes',
       badge: pendentesCount > 0 ? pendentesCount : null,
     },
-    { id: 'conexoes', label: 'Conexoes' },
     { id: 'upload', label: 'Upload' },
   ]
 
@@ -1173,7 +920,7 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
               </span>
             )}
           </h1>
-          <p className="text-white/40 text-sm">Conecte seus bancos gratuitamente via Open Finance</p>
+          <p className="text-white/40 text-sm">Importe extratos via PDF, OFX ou CSV</p>
         </div>
       </div>
 
@@ -1206,10 +953,7 @@ export default function ImportPage({ user, outro, colors, triggerRefresh }) {
         {activeTab === 'pendentes' && (
           <TabPendentes user={user} outro={outro} colors={colors} onRefresh={handlePendentesRefresh} />
         )}
-        {activeTab === 'conexoes' && (
-          <TabConexoes user={user} colors={colors} />
-        )}
-        {activeTab === 'upload' && (
+{activeTab === 'upload' && (
           <TabUpload user={user} onImported={handleUploadSuccess} />
         )}
       </div>

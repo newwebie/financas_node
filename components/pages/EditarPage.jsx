@@ -636,7 +636,7 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       </div>
 
       {/* Filters */}
-      <div className="flex gap-1.5 flex-wrap">
+      <div className="flex gap-1.5 flex-wrap items-center">
         {/* Categoria */}
         <div className="relative" onClick={(e) => e.stopPropagation()}>
           <button
@@ -773,6 +773,9 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
             Limpar filtros
           </button>
         )}
+        <span className="ml-auto text-white/60 text-xs font-semibold tabular-nums">
+          {fmt(displayedItems.reduce((sum, item) => sum + (item._value || 0), 0))}
+        </span>
       </div>
 
       {/* Results count */}
