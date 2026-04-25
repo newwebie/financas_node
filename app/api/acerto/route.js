@@ -39,9 +39,53 @@ export async function POST(request) {
         .map(i => new ObjectId(i.id))
 
       if (despesaIds.length > 0) {
+        // Busca originais para criar espelhos antes de atualizar
+        const originais = await colls.despesas.find({ _id: { $in: despesaIds } }).toArray()
+        const espelhos = originais
+          .filter(d => d.devedor && d.valor_pendente > 0)
+          .map(d => ({
+            label: d.label,
+            buyer: d.devedor,
+            item: d.item || '',
+            description: d.description || '',
+            quantity: 1,
+            total_value: d.valor_pendente,
+            payment_method: d.payment_method,
+            installment: 0,
+            createdAt: now,
+            pagamento_compartilhado: 'Pra mim',
+            tem_pendencia: false,
+            devedor: null,
+            valor_pendente: null,
+            status_pendencia: null,
+            uso_pessoal: d.uso_pessoal || false,
+            lugar_nome: d.lugar_nome || null,
+            auto_lancado: false,
+            // rastreabilidade: quem comprou de fato
+            acerto_ref: {
+              comprado_por: d.buyer,
+              despesa_id: d._id,
+              valor_total_original: d.total_value,
+            },
+          }))
+        if (espelhos.length > 0) await colls.despesas.insertMany(espelhos)
+
+        // Pipeline update: marca quitado e desconta a parte acertada do total do comprador original
         await colls.despesas.updateMany(
           { _id: { $in: despesaIds } },
-          { $set: { status_pendencia: 'quitado', data_quitacao: now } }
+          [{
+            $set: {
+              status_pendencia: 'quitado',
+              data_quitacao: now,
+              total_value: {
+                $cond: {
+                  if: { $and: [{ $ne: ['$devedor', null] }, { $gt: ['$valor_pendente', 0] }] },
+                  then: { $subtract: ['$total_value', '$valor_pendente'] },
+                  else: '$total_value',
+                },
+              },
+            },
+          }]
         )
         await colls.quitacoes.updateMany(
           { despesa_id: { $in: despesaIds }, status: 'em aberto', tipo: 'despesa_compartilhada' },

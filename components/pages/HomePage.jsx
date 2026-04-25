@@ -824,6 +824,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
                     <p className="text-white text-sm font-medium truncate">{txn.item}</p>
                     <p className="text-white/40 text-xs">
                       {formatDateFull(txn.createdAt)}
+                      {txn.acerto_ref && <span className="text-lavender-400/70"> · via {txn.acerto_ref.comprado_por}</span>}
                     </p>
                   </div>
                 </div>

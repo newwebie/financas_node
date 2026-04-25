@@ -993,7 +993,10 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
                 <div key={d._id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03]">
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-xs font-medium truncate">{d.item}</p>
-                    <p className="text-white/30 text-[10px] truncate">{formatDateFull(d.createdAt)} • {d.payment_method}</p>
+                    <p className="text-white/30 text-[10px] truncate">
+                      {formatDateFull(d.createdAt)} • {d.payment_method}
+                      {d.acerto_ref && <span className="text-lavender-400/70"> · via {d.acerto_ref.comprado_por}</span>}
+                    </p>
                   </div>
                   <p className="text-white text-xs font-semibold flex-shrink-0">{fmt(d.total_value)}</p>
                 </div>

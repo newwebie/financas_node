@@ -60,7 +60,59 @@ export async function PUT(request) {
     const colls = await getCollections()
     const { _id, ...data } = body
     if (data.createdAt) data.createdAt = new Date(`${data.createdAt}T12:00:00`)
-    await colls.despesas.updateOne({ _id: new ObjectId(_id) }, { $set: data })
+
+    const despesaObjId = new ObjectId(_id)
+    const old = await colls.despesas.findOne({ _id: despesaObjId })
+
+    // Garante consistência: "Pra mim" sempre zera pendência
+    if (data.pagamento_compartilhado === 'Pra mim') {
+      data.tem_pendencia = false
+      data.devedor = null
+      data.valor_pendente = null
+      if (!data.status_pendencia) data.status_pendencia = null
+    }
+
+    await colls.despesas.updateOne({ _id: despesaObjId }, { $set: data })
+
+    // Cascade para quitacoes em aberto
+    const merged = { ...old, ...data }
+    const hadPendencia = old?.tem_pendencia
+    const hasPendencia = 'tem_pendencia' in data ? data.tem_pendencia : hadPendencia
+
+    if (hadPendencia && !hasPendencia) {
+      // Perdeu pendência → remove quitacao em aberto
+      await colls.quitacoes.deleteMany({ despesa_id: despesaObjId, status: 'em aberto' })
+    } else if (!hadPendencia && hasPendencia && merged.devedor) {
+      // Ganhou pendência → cria quitacao
+      const parts = [merged.label, merged.item].filter(Boolean)
+      await colls.quitacoes.insertOne({
+        tipo: 'despesa_compartilhada',
+        despesa_id: despesaObjId,
+        data: new Date(),
+        credor: merged.buyer,
+        devedor: merged.devedor,
+        valor: merged.valor_pendente,
+        descricao: parts.join(' - '),
+        observacao: merged.description || null,
+        status: 'em aberto',
+      })
+    } else if (hadPendencia && hasPendencia) {
+      // Continua com pendência → atualiza quitacao em aberto
+      const parts = [merged.label, merged.item].filter(Boolean)
+      await colls.quitacoes.updateOne(
+        { despesa_id: despesaObjId, status: 'em aberto' },
+        {
+          $set: {
+            credor: merged.buyer,
+            devedor: merged.devedor,
+            valor: merged.valor_pendente,
+            descricao: parts.join(' - '),
+            observacao: merged.description || null,
+          },
+        }
+      )
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

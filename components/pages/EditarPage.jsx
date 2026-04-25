@@ -350,7 +350,13 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Valor Total</label>
-              <input type="number" step="0.01" value={editData.total_value || ''} onChange={(e) => setEditData({ ...editData, total_value: parseFloat(e.target.value) })} className={inputClass} />
+              <input type="number" step="0.01" value={editData.total_value || ''} onChange={(e) => {
+                const val = parseFloat(e.target.value) || 0
+                const updates = { total_value: val }
+                if (editData.pagamento_compartilhado === 'Dividido (me deve metade)') updates.valor_pendente = val / 2
+                else if (editData.pagamento_compartilhado === 'Pra outra (me deve tudo)') updates.valor_pendente = val
+                setEditData({ ...editData, ...updates })
+              }} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Parcelas</label>
@@ -365,7 +371,27 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           </div>
           <div>
             <label className={labelClass}>Tipo de compra</label>
-            <select value={editData.pagamento_compartilhado || 'Pra mim'} onChange={(e) => setEditData({ ...editData, pagamento_compartilhado: e.target.value })} className={inputClass}>
+            <select value={editData.pagamento_compartilhado || 'Pra mim'} onChange={(e) => {
+              const val = e.target.value
+              const updates = { pagamento_compartilhado: val }
+              if (val === 'Pra mim') {
+                updates.tem_pendencia = false
+                updates.devedor = null
+                updates.valor_pendente = null
+                updates.status_pendencia = null
+              } else if (val === 'Dividido (me deve metade)') {
+                updates.tem_pendencia = true
+                updates.devedor = outro
+                updates.valor_pendente = (editData.total_value || 0) / 2
+                updates.status_pendencia = editData.status_pendencia || 'em aberto'
+              } else if (val === 'Pra outra (me deve tudo)') {
+                updates.tem_pendencia = true
+                updates.devedor = outro
+                updates.valor_pendente = editData.total_value || 0
+                updates.status_pendencia = editData.status_pendencia || 'em aberto'
+              }
+              setEditData({ ...editData, ...updates })
+            }} className={inputClass}>
               <option value="Pra mim">Pra mim</option>
               <option value="Dividido (me deve metade)">Dividido (me deve metade)</option>
               <option value="Pra outra (me deve tudo)">Pra outra (me deve tudo)</option>
