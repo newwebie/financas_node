@@ -50,7 +50,7 @@ export async function POST(request) {
             description: d.description || '',
             quantity: 1,
             total_value: d.valor_pendente,
-            payment_method: d.payment_method,
+            payment_method: 'Pix',
             installment: 0,
             createdAt: now,
             pagamento_compartilhado: 'Pra mim',

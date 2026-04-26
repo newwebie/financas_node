@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Skeleton, EmptyState, Badge, CategoryIcon } from '@/components/ui/Cards'
 import { fmt, formatDateFull, formatDate, getCategoryDisplay, CATEGORIES, CATEGORIAS, PAYMENT_METHODS, STATUS_TERCEIROS, toLocalDateString } from '@/lib/helpers'
-import { ChevronDown, Save, Trash2, Ban, Check, CircleAlert, Search, X, ArrowDown, ArrowUp } from 'lucide-react'
+import { ChevronDown, Save, Trash2, Ban, Check, CircleAlert, Search, X, ArrowDown, ArrowUp, CalendarDays } from 'lucide-react'
 
 // Pseudo-categorias para tipos que nao sao despesas
 const EXTRA_CATEGORIAS = [
@@ -30,6 +30,10 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
   const [sortBy, setSortBy] = useState('date')
   const [sortDir, setSortDir] = useState('desc')
   const [openFilter, setOpenFilter] = useState(null)
+
+  // Date jump
+  const dateRefs = useRef({})
+  const dateInputRef = useRef(null)
 
   useEffect(() => { loadAllData() }, [user, refreshKey])
 
@@ -66,37 +70,24 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
 
       const items = []
 
-      // Despesas - cada uma ja tem label como categoria
       despesas.forEach(d => {
         items.push({ ...d, _tipo: 'despesas', _categoria: d.label, _endpoint: '/api/despesas', _date: d.createdAt, _value: d.total_value })
       })
-
-      // Emprestimos pessoais (entre usuarios) - quem emprestou
       emprestimos.filter(e => e.de === user).forEach(e => {
         items.push({ ...e, _tipo: 'emprestimos', _categoria: '_emprestimo_pessoal', _endpoint: '/api/emprestimos', _date: e.createdAt, _value: e.valor })
       })
-
-      // Emprestimos pessoais - quem deve
       emprestimos.filter(e => e.para === user).forEach(e => {
         items.push({ ...e, _tipo: 'dividas', _categoria: '_emprestimo_pessoal', _endpoint: '/api/emprestimos', _date: e.createdAt, _value: e.valor })
       })
-
-      // Contas fixas
       contasFixas.filter(c => c.buyer === user || c.responsavel === user).forEach(c => {
         items.push({ ...c, _tipo: 'contas-fixas', _categoria: '_contas_fixas', _endpoint: '/api/contas-fixas', _date: null, _value: c.valor })
       })
-
-      // Metas
       metas.forEach(m => {
         items.push({ ...m, _tipo: 'metas', _categoria: '_metas', _endpoint: '/api/metas', _date: null, _value: m.limite })
       })
-
-      // Emprestimos terceiros
       empTerceiros.forEach(e => {
         items.push({ ...e, _tipo: 'emprestimos-terceiros', _categoria: '_emprestimo_terceiros', _endpoint: '/api/emprestimos-terceiros', _date: e.data_emprestimo, _value: e.valor })
       })
-
-      // Dividas terceiros
       divTerceiros.forEach(d => {
         items.push({ ...d, _tipo: 'dividas-terceiros', _categoria: '_dividas_terceiros', _endpoint: '/api/dividas-terceiros', _date: d.data_emprestimo, _value: d.valor })
       })
@@ -112,7 +103,6 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
   const displayedItems = useMemo(() => {
     let result = [...allItems]
 
-    // Search - busca em todos os campos relevantes
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       result = result.filter(item => {
@@ -120,23 +110,9 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
         return fields.some(f => String(f || '').toLowerCase().includes(q))
       })
     }
-
-    // Category filter
-    if (filters.categoria) {
-      result = result.filter(item => item._categoria === filters.categoria)
-    }
-
-    // Payment filter
-    if (filters.pagamento) {
-      result = result.filter(item => item.payment_method === filters.pagamento)
-    }
-
-    // Status filter
-    if (filters.status) {
-      result = result.filter(item => item.status === filters.status)
-    }
-
-    // Month filter
+    if (filters.categoria) result = result.filter(item => item._categoria === filters.categoria)
+    if (filters.pagamento) result = result.filter(item => item.payment_method === filters.pagamento)
+    if (filters.status) result = result.filter(item => item.status === filters.status)
     if (filters.mes) {
       result = result.filter(item => {
         if (!item._date) return false
@@ -146,7 +122,6 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       })
     }
 
-    // Sort
     result.sort((a, b) => {
       let cmp = 0
       if (sortBy === 'date') {
@@ -163,6 +138,40 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
 
     return result
   }, [allItems, searchQuery, filters, sortBy, sortDir])
+
+  // Agrupa por data (só quando ordenado por data)
+  const groupedItems = useMemo(() => {
+    if (sortBy !== 'date') return null
+    const map = new Map()
+    for (const item of displayedItems) {
+      let dateKey = 'sem-data'
+      let dateLabel = 'Sem data'
+      if (item._date) {
+        const d = new Date(item._date)
+        const y = d.getFullYear()
+        const mo = d.getMonth()
+        const day = d.getDate()
+        dateKey = `${y}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        dateLabel = new Date(y, mo, day).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      }
+      if (!map.has(dateKey)) map.set(dateKey, { dateKey, dateLabel, items: [] })
+      map.get(dateKey).items.push(item)
+    }
+    return [...map.values()]
+  }, [displayedItems, sortBy])
+
+  function handleDateJump(dateStr) {
+    // garante que o sort está por data para os grupos existirem
+    if (sortBy !== 'date') {
+      setSortBy('date')
+      setSortDir('desc')
+    }
+    setTimeout(() => {
+      const el = dateRefs.current[dateStr]
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      else showToast('Nenhum registro nessa data', 'error')
+    }, 50)
+  }
 
   function handleExpand(item) {
     if (expandedId === item._id) {
@@ -323,6 +332,70 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
     }
   }
 
+  function renderItemCard(item) {
+    const isExpanded = expandedId === item._id
+    const display = getItemDisplay(item)
+    return (
+      <div key={`${item._tipo}-${item._id}`} className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => handleExpand(item)}
+          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors"
+        >
+          <CategoryIcon category={display.catId} size={18} className="text-white/60 flex-shrink-0" />
+          <div className="flex-1 text-left min-w-0">
+            <p className="text-white text-sm font-medium truncate">{display.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-white/40 text-xs truncate">{display.meta}</p>
+              {display.status && (
+                <Badge color={display.status === 'em aberto' ? 'coral' : 'mint'}>
+                  {display.status === 'em aberto' ? 'Aberto' : 'Quitado'}
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-white font-semibold text-sm">{fmt(display.value)}</span>
+            <ChevronDown size={14} className={`text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="px-4 pb-4 space-y-3">
+            {renderEditForm(item)}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSave(item)}
+                disabled={saving}
+                className={`flex-1 bg-gradient-to-br ${colors.gradient} text-white rounded-xl py-2.5 px-4
+                            flex items-center justify-center gap-2 font-medium
+                            hover:opacity-90 transition-opacity disabled:opacity-50`}
+              >
+                <Save size={16} />
+                {saving ? 'Salvando...' : 'Salvar'}
+              </button>
+              {item._tipo === 'contas-fixas' && (
+                <button
+                  onClick={() => handleCancelarContaFixa(item)}
+                  className="px-4 py-2.5 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-colors flex items-center gap-2"
+                >
+                  <Ban size={16} />
+                  Cancelar
+                </button>
+              )}
+              <button
+                onClick={() => handleDelete(item)}
+                className="px-4 py-2.5 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors flex items-center gap-2"
+              >
+                <Trash2 size={16} />
+                Excluir
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   function renderEditForm(item) {
     const tipo = item._tipo
     const inputClass = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-white/20 transition-colors'
@@ -425,86 +498,50 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
         <div className="space-y-3 p-4 bg-white/5 rounded-2xl">
           <div>
             <label className={labelClass}>Nome</label>
-            <input
-              type="text"
-              value={editData.nome || ''}
-              onChange={(e) => setEditData({ ...editData, nome: e.target.value })}
-              className={inputClass}
-            />
+            <input type="text" value={editData.nome || ''} onChange={(e) => setEditData({ ...editData, nome: e.target.value })} className={inputClass} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Valor</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editData.valor || ''}
-                onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })}
-                className={inputClass}
-              />
+              <input type="number" step="0.01" value={editData.valor || ''} onChange={(e) => setEditData({ ...editData, valor: parseFloat(e.target.value) })} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Dia Vencimento</label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={editData.dia_vencimento || ''}
-                onChange={(e) => setEditData({ ...editData, dia_vencimento: parseInt(e.target.value) })}
-                className={inputClass}
-              />
+              <input type="number" min="1" max="31" value={editData.dia_vencimento || ''} onChange={(e) => setEditData({ ...editData, dia_vencimento: parseInt(e.target.value) })} className={inputClass} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Categoria</label>
-              <select
-                value={editData.categoria || 'Contas'}
-                onChange={(e) => setEditData({ ...editData, categoria: e.target.value })}
-                className={inputClass}
-              >
-                {CATEGORIES.map(cat => (
-                  <option key={cat.value} value={cat.value}>{cat.emoji} {cat.label}</option>
-                ))}
+              <select value={editData.categoria || 'Contas'} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className={inputClass}>
+                {CATEGORIES.map(cat => <option key={cat.value} value={cat.value}>{cat.emoji} {cat.label}</option>)}
               </select>
             </div>
             <div>
               <label className={labelClass}>Pagamento</label>
-              <select
-                value={editData.payment_method || ''}
-                onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })}
-                className={inputClass}
-              >
+              <select value={editData.payment_method || ''} onChange={(e) => setEditData({ ...editData, payment_method: e.target.value })} className={inputClass}>
                 {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
           </div>
           <div>
             <label className={labelClass}>Responsável</label>
-            <select
-              value={editData.buyer || user}
-              onChange={(e) => setEditData({ ...editData, buyer: e.target.value })}
-              className={inputClass}
-            >
+            <select value={editData.buyer || user} onChange={(e) => setEditData({ ...editData, buyer: e.target.value })} className={inputClass}>
               <option value={user}>{user}</option>
               <option value={outro}>{outro}</option>
             </select>
           </div>
           <div className="flex gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
-              <div
-                onClick={() => setEditData({ ...editData, cartao_credito: !editData.cartao_credito })}
-                className={`w-9 h-5 rounded-full transition-colors ${editData.cartao_credito ? 'bg-su-500' : 'bg-white/10'} relative`}
-              >
+              <div onClick={() => setEditData({ ...editData, cartao_credito: !editData.cartao_credito })}
+                className={`w-9 h-5 rounded-full transition-colors ${editData.cartao_credito ? 'bg-su-500' : 'bg-white/10'} relative`}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${editData.cartao_credito ? 'left-4' : 'left-0.5'}`} />
               </div>
               <span className="text-white/60 text-xs">Cartão de crédito</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <div
-                onClick={() => setEditData({ ...editData, debito_automatico: !editData.debito_automatico })}
-                className={`w-9 h-5 rounded-full transition-colors ${editData.debito_automatico ? 'bg-su-500' : 'bg-white/10'} relative`}
-              >
+              <div onClick={() => setEditData({ ...editData, debito_automatico: !editData.debito_automatico })}
+                className={`w-9 h-5 rounded-full transition-colors ${editData.debito_automatico ? 'bg-su-500' : 'bg-white/10'} relative`}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${editData.debito_automatico ? 'left-4' : 'left-0.5'}`} />
               </div>
               <span className="text-white/60 text-xs">Débito automático</span>
@@ -614,7 +651,6 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
 
   const activeFilterCount = [filters.categoria, filters.pagamento, filters.status, filters.mes].filter(Boolean).length
 
-  // Categorias que realmente existem nos dados carregados
   const categoriasPresentes = useMemo(() => {
     const ids = new Set(allItems.map(i => i._categoria))
     return ALL_CATEGORIAS.filter(c => ids.has(c.id))
@@ -625,7 +661,24 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-white">Editar Registros</h1>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1.5">
+          {/* Botão ir para data */}
+          <div className="relative">
+            <button
+              onClick={() => dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.click()}
+              title="Ir para data"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-white/5 text-white/40 border border-white/10 hover:text-white/70 hover:bg-white/10 transition-all"
+            >
+              <CalendarDays size={12} />
+            </button>
+            <input
+              ref={dateInputRef}
+              type="date"
+              className="absolute opacity-0 w-0 h-0 pointer-events-none"
+              onChange={(e) => { if (e.target.value) handleDateJump(e.target.value) }}
+            />
+          </div>
+          {/* Sort */}
           {[
             { id: 'date', label: 'Data' },
             { id: 'value', label: 'Valor' },
@@ -678,9 +731,7 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           {openFilter === 'categoria' && (
             <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 max-h-60 overflow-y-auto min-w-[180px]">
               <button onClick={() => { setFilters(f => ({ ...f, categoria: null })); setOpenFilter(null) }}
-                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
-                Todas
-              </button>
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">Todas</button>
               {categoriasPresentes.map(cat => (
                 <button key={cat.id} onClick={() => { setFilters(f => ({ ...f, categoria: cat.id })); setOpenFilter(null) }}
                   className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10 flex items-center gap-2
@@ -708,15 +759,11 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           {openFilter === 'pagamento' && (
             <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 min-w-[120px]">
               <button onClick={() => { setFilters(f => ({ ...f, pagamento: null })); setOpenFilter(null) }}
-                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
-                Todos
-              </button>
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">Todos</button>
               {PAYMENT_METHODS.map(m => (
                 <button key={m} onClick={() => { setFilters(f => ({ ...f, pagamento: m })); setOpenFilter(null) }}
                   className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
-                    ${filters.pagamento === m ? 'text-white bg-white/5' : 'text-white/70'}`}>
-                  {m}
-                </button>
+                    ${filters.pagamento === m ? 'text-white bg-white/5' : 'text-white/70'}`}>{m}</button>
               ))}
             </div>
           )}
@@ -737,15 +784,11 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           {openFilter === 'status' && (
             <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 min-w-[130px]">
               <button onClick={() => { setFilters(f => ({ ...f, status: null })); setOpenFilter(null) }}
-                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
-                Todos
-              </button>
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">Todos</button>
               {STATUS_TERCEIROS.map(s => (
                 <button key={s.value} onClick={() => { setFilters(f => ({ ...f, status: s.value })); setOpenFilter(null) }}
                   className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
-                    ${filters.status === s.value ? 'text-white bg-white/5' : 'text-white/70'}`}>
-                  {s.label}
-                </button>
+                    ${filters.status === s.value ? 'text-white bg-white/5' : 'text-white/70'}`}>{s.label}</button>
               ))}
             </div>
           )}
@@ -766,15 +809,11 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
           {openFilter === 'mes' && (
             <div className="absolute top-full mt-1 left-0 bg-base-700 border border-white/10 rounded-xl shadow-lg p-1.5 z-20 min-w-[130px]">
               <button onClick={() => { setFilters(f => ({ ...f, mes: null })); setOpenFilter(null) }}
-                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">
-                Todos
-              </button>
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/10">Todos</button>
               {getMonthOptions().map(m => (
                 <button key={m.value} onClick={() => { setFilters(f => ({ ...f, mes: m.value })); setOpenFilter(null) }}
                   className={`w-full text-left px-3 py-1.5 rounded-lg text-xs hover:bg-white/10
-                    ${filters.mes === m.value ? 'text-white bg-white/5' : 'text-white/70'}`}>
-                  {m.label}
-                </button>
+                    ${filters.mes === m.value ? 'text-white bg-white/5' : 'text-white/70'}`}>{m.label}</button>
               ))}
             </div>
           )}
@@ -824,69 +863,20 @@ export default function EditarPage({ user, outro, colors, refreshKey, triggerRef
         </div>
       ) : displayedItems.length > 0 ? (
         <div className="space-y-2">
-          {displayedItems.map((item) => {
-            const isExpanded = expandedId === item._id
-            const display = getItemDisplay(item)
-            return (
-              <div key={`${item._tipo}-${item._id}`} className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden">
-                <button
-                  onClick={() => handleExpand(item)}
-                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors"
-                >
-                  <CategoryIcon category={display.catId} size={18} className="text-white/60 flex-shrink-0" />
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="text-white text-sm font-medium truncate">{display.name}</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-white/40 text-xs truncate">{display.meta}</p>
-                      {display.status && (
-                        <Badge color={display.status === 'em aberto' ? 'coral' : 'mint'}>
-                          {display.status === 'em aberto' ? 'Aberto' : 'Quitado'}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-white font-semibold text-sm">{fmt(display.value)}</span>
-                    <ChevronDown size={14} className={`text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="px-4 pb-4 space-y-3">
-                    {renderEditForm(item)}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleSave(item)}
-                        disabled={saving}
-                        className={`flex-1 bg-gradient-to-br ${colors.gradient} text-white rounded-xl py-2.5 px-4
-                                    flex items-center justify-center gap-2 font-medium
-                                    hover:opacity-90 transition-opacity disabled:opacity-50`}
-                      >
-                        <Save size={16} />
-                        {saving ? 'Salvando...' : 'Salvar'}
-                      </button>
-                      {item._tipo === 'contas-fixas' && (
-                        <button
-                          onClick={() => handleCancelarContaFixa(item)}
-                          className="px-4 py-2.5 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-colors flex items-center gap-2"
-                        >
-                          <Ban size={16} />
-                          Cancelar
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(item)}
-                        className="px-4 py-2.5 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors flex items-center gap-2"
-                      >
-                        <Trash2 size={16} />
-                        Excluir
-                      </button>
-                    </div>
-                  </div>
-                )}
+          {groupedItems ? (
+            groupedItems.map(({ dateKey, dateLabel, items }) => (
+              <div key={dateKey} ref={el => { dateRefs.current[dateKey] = el }}>
+                <p className="text-white/30 text-[11px] font-medium px-1 pt-3 pb-1.5 capitalize tracking-wide">
+                  {dateLabel}
+                </p>
+                <div className="space-y-2">
+                  {items.map(item => renderItemCard(item))}
+                </div>
               </div>
-            )
-          })}
+            ))
+          ) : (
+            displayedItems.map(item => renderItemCard(item))
+          )}
         </div>
       ) : (
         <EmptyState

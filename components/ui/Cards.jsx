@@ -1,6 +1,6 @@
 'use client'
 
-import { Utensils, Fuel, Car, Beer, Shirt, Pill, Gamepad2, Receipt, Home, PiggyBank, TrendingUp, Scissors, Package, Handshake, Target, FileText, Landmark, Search, Eye, Users } from 'lucide-react'
+import { Utensils, Fuel, Car, Beer, Shirt, Pill, Gamepad2, Receipt, Home, PiggyBank, TrendingUp, Scissors, Package, Handshake, Target, FileText, Landmark, Search, Eye, Users, Plane } from 'lucide-react'
 
 // Mapa de icones Lucide por categoria
 const ICON_MAP = {
@@ -16,7 +16,8 @@ const ICON_MAP = {
   Cofrinho: PiggyBank,
   'Renda Variavel': TrendingUp,
   Trancas: Scissors,
-  Taro: Eye,
+  Espiritualidade: Eye,
+  Viagem: Plane,
   Outros: Package,
   _emprestimo_pessoal: Handshake,
   _contas_fixas: FileText,

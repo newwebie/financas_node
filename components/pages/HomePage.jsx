@@ -345,7 +345,7 @@ export default function HomePage({ user, outro, colors, refreshKey, triggerRefre
       if (d.installment <= 1 || d.payment_method !== 'Credito') return false
       const dc = new Date(d.createdAt)
       const meses = (refDate.getFullYear() - dc.getFullYear()) * 12 + (refDate.getMonth() - dc.getMonth())
-      return meses < d.installment
+      return meses >= 0 && meses < d.installment
     }).reduce((sum, d) => sum + d.total_value, 0)
 
     const dividasAbertas = dividasTerceiros.filter(d => d.status === 'em aberto')

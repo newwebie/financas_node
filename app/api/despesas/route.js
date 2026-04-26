@@ -69,48 +69,49 @@ export async function PUT(request) {
       data.tem_pendencia = false
       data.devedor = null
       data.valor_pendente = null
-      if (!data.status_pendencia) data.status_pendencia = null
+      data.status_pendencia = null
     }
 
-    await colls.despesas.updateOne({ _id: despesaObjId }, { $set: data })
-
-    // Cascade para quitacoes em aberto
     const merged = { ...old, ...data }
     const hadPendencia = old?.tem_pendencia
     const hasPendencia = 'tem_pendencia' in data ? data.tem_pendencia : hadPendencia
 
+    // Re-abrindo pendência que estava quitada: reseta status
+    if (hasPendencia && merged.status_pendencia === 'quitado') {
+      data.status_pendencia = 'em aberto'
+      merged.status_pendencia = 'em aberto'
+    }
+
+    await colls.despesas.updateOne({ _id: despesaObjId }, { $set: data })
+
+    // Cascade para quitacoes
+    const parts = [merged.label, merged.item].filter(Boolean)
+
     if (hadPendencia && !hasPendencia) {
-      // Perdeu pendência → remove quitacao em aberto
+      // Perdeu pendência → remove quitacoes em aberto
       await colls.quitacoes.deleteMany({ despesa_id: despesaObjId, status: 'em aberto' })
-    } else if (!hadPendencia && hasPendencia && merged.devedor) {
-      // Ganhou pendência → cria quitacao
-      const parts = [merged.label, merged.item].filter(Boolean)
-      await colls.quitacoes.insertOne({
-        tipo: 'despesa_compartilhada',
-        despesa_id: despesaObjId,
-        data: new Date(),
-        credor: merged.buyer,
-        devedor: merged.devedor,
-        valor: merged.valor_pendente,
-        descricao: parts.join(' - '),
-        observacao: merged.description || null,
-        status: 'em aberto',
-      })
-    } else if (hadPendencia && hasPendencia) {
-      // Continua com pendência → atualiza quitacao em aberto
-      const parts = [merged.label, merged.item].filter(Boolean)
-      await colls.quitacoes.updateOne(
-        { despesa_id: despesaObjId, status: 'em aberto' },
-        {
-          $set: {
-            credor: merged.buyer,
-            devedor: merged.devedor,
-            valor: merged.valor_pendente,
-            descricao: parts.join(' - '),
-            observacao: merged.description || null,
-          },
-        }
-      )
+    } else if (hasPendencia && merged.devedor) {
+      // Tem pendência (nova ou contínua) → upsert na quitacao em aberto
+      const jaTemAberta = await colls.quitacoes.findOne({ despesa_id: despesaObjId, status: 'em aberto' })
+      if (jaTemAberta) {
+        await colls.quitacoes.updateOne(
+          { despesa_id: despesaObjId, status: 'em aberto' },
+          { $set: { credor: merged.buyer, devedor: merged.devedor, valor: merged.valor_pendente, descricao: parts.join(' - '), observacao: merged.description || null } }
+        )
+      } else {
+        // Nenhuma em aberto (nunca criada ou foi quitada) → cria nova
+        await colls.quitacoes.insertOne({
+          tipo: 'despesa_compartilhada',
+          despesa_id: despesaObjId,
+          data: new Date(),
+          credor: merged.buyer,
+          devedor: merged.devedor,
+          valor: merged.valor_pendente,
+          descricao: parts.join(' - '),
+          observacao: merged.description || null,
+          status: 'em aberto',
+        })
+      }
     }
 
     return NextResponse.json({ success: true })

@@ -242,7 +242,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       if (d.installment <= 1 || d.payment_method !== 'Credito') return false
       const dc = new Date(d.createdAt)
       const meses = (refDate.getFullYear() - dc.getFullYear()) * 12 + (refDate.getMonth() - dc.getMonth())
-      return meses < d.installment
+      return meses >= 0 && meses < d.installment
     })
     const parcelasMes = parcelasAtivas.reduce((sum, d) => sum + (d.total_value / d.installment), 0)
     const fixasCredito = fixasAtual.filter(c => c.cartao_credito).reduce((sum, c) => sum + (c.valor || 0), 0)
@@ -250,7 +250,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     const parcelasProxMes = parcelasAtivas.filter(d => {
       const dc = new Date(d.createdAt)
       const meses = (refDate.getFullYear() - dc.getFullYear()) * 12 + (refDate.getMonth() - dc.getMonth())
-      return meses + 1 < d.installment
+      return meses >= 0 && meses + 1 < d.installment
     })
     const proximoMes = parcelasProxMes.reduce((sum, d) => sum + (d.total_value / d.installment), 0) + fixasCredito
     const faturaEstimada = comprasCredito + parcelasMes + fixasCredito
