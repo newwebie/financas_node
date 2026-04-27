@@ -59,7 +59,10 @@ export async function PUT(request) {
     const body = await request.json()
     const colls = await getCollections()
     const { _id, ...data } = body
-    if (data.createdAt) data.createdAt = new Date(`${data.createdAt}T12:00:00`)
+    if (data.createdAt) {
+      const raw = String(data.createdAt)
+      data.createdAt = raw.length === 10 ? new Date(`${raw}T12:00:00`) : new Date(raw)
+    }
 
     const despesaObjId = new ObjectId(_id)
     const old = await colls.despesas.findOne({ _id: despesaObjId })
