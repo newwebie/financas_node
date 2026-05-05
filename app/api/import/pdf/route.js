@@ -4,6 +4,23 @@ import { NextResponse } from 'next/server'
 import { getCollections } from '@/lib/mongodb'
 import { processarTransacao } from '@/lib/import-transacao'
 
+// pdfjs-dist references DOMMatrix at module init time — polyfill for Node.js/Vercel
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor() {
+      this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
+      this.m11 = 1; this.m12 = 0; this.m13 = 0; this.m14 = 0;
+      this.m21 = 0; this.m22 = 1; this.m23 = 0; this.m24 = 0;
+      this.m31 = 0; this.m32 = 0; this.m33 = 1; this.m34 = 0;
+      this.m41 = 0; this.m42 = 0; this.m43 = 0; this.m44 = 1;
+      this.is2D = true; this.isIdentity = true;
+    }
+    static fromMatrix() { return new globalThis.DOMMatrix() }
+    static fromFloat32Array() { return new globalThis.DOMMatrix() }
+    static fromFloat64Array() { return new globalThis.DOMMatrix() }
+  }
+}
+
 function parseBRAmount(str) {
   return parseFloat(str.replace(/\./g, '').replace(',', '.'))
 }
@@ -83,6 +100,7 @@ export async function POST(request) {
     const { PDFParse } = await import('pdf-parse')
     const parser = new PDFParse({ data: buffer })
     const pdfData = await parser.getText()
+    await parser.destroy()
 
     const lines = pdfData.text.split('\n')
     const transactions = lines.map(parseLine).filter(Boolean)
