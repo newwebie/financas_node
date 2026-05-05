@@ -144,11 +144,23 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
   }
 
   function updateSplitItem(idx, field, val) {
-    setSplitItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it))
+    setSplitItems(prev => {
+      if (field === 'valor') {
+        const outros = prev.reduce((s, it, i) => i !== idx ? s + (parseFloat(it.valor) || 0) : s, 0)
+        const max = parseFloat((valor - outros).toFixed(2))
+        const v = Math.min(parseFloat(val) || 0, max)
+        return prev.map((it, i) => i === idx ? { ...it, valor: v } : it)
+      }
+      return prev.map((it, i) => i === idx ? { ...it, [field]: val } : it)
+    })
   }
 
   function addSplitItem() {
-    setSplitItems(prev => [...prev, { nome: '', categoria: 'Outros', valor: 0 }])
+    setSplitItems(prev => {
+      const usado = prev.reduce((s, it) => s + (parseFloat(it.valor) || 0), 0)
+      const restante = parseFloat((valor - usado).toFixed(2))
+      return [...prev, { nome: '', categoria: 'Outros', valor: restante > 0 ? restante : 0 }]
+    })
   }
 
   function removeSplitItem(idx) {

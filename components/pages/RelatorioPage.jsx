@@ -41,6 +41,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       const periodoAtual = getPeriodo(cfg, user, mesesAtras)
       const periodoAnterior = getPeriodo(cfg, user, mesesAtras + 1)
       const periodoDoisAtras = getPeriodo(cfg, user, mesesAtras + 2)
+      const periodoTresAtras = getPeriodo(cfg, user, mesesAtras + 3)
 
       const fixasDoUser = cf.filter(c => c.buyer === user || c.responsavel === user)
       // Filtrar contas fixas ativas no período atual para exibição
@@ -58,7 +59,7 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       setEmprestimosTerceiros(empTerceiros)
       setPeriodos({ atual: periodoAtual, anterior: periodoAnterior, doisAtras: periodoDoisAtras })
 
-      calcularMetricas(desp, fixasDoUser, metasData, dividas, empTerceiros, periodoAtual, periodoAnterior, periodoDoisAtras)
+      calcularMetricas(desp, fixasDoUser, metasData, dividas, empTerceiros, periodoAtual, periodoAnterior, periodoDoisAtras, periodoTresAtras)
     } catch (error) {
       console.error('Erro ao carregar relatório:', error)
     } finally {
@@ -106,13 +107,16 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
     })
   }
 
-  function calcularMetricas(allDespesas, fixas, metasData, allDividas, allEmprestimos, periodoAtual, periodoAnterior, periodoDoisAtras) {
+  function calcularMetricas(allDespesas, fixas, metasData, allDividas, allEmprestimos, periodoAtual, periodoAnterior, periodoDoisAtras, periodoTresAtras) {
     const fixasAtual = filtrarFixasPeriodo(fixas, periodoAtual)
     const fixasAnterior = filtrarFixasPeriodo(fixas, periodoAnterior)
+    const fixasDoisAtras = filtrarFixasPeriodo(fixas, periodoDoisAtras)
+    const fixasTresAtras = filtrarFixasPeriodo(fixas, periodoTresAtras)
 
     const despAtual = filtrarDespesasPeriodo(allDespesas, periodoAtual)
     const despAnterior = filtrarDespesasPeriodo(allDespesas, periodoAnterior)
     const despDoisAtras = filtrarDespesasPeriodo(allDespesas, periodoDoisAtras)
+    const despTresAtras = filtrarDespesasPeriodo(allDespesas, periodoTresAtras)
 
     // Empréstimos a terceiros e dívidas quitadas — contam só no mês em que ocorreram
     function calcExtras(periodo) {
@@ -210,13 +214,48 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       gastosPorCategoriaAnterior[cat] = (gastosPorCategoriaAnterior[cat] || 0) + (c.valor || 0)
     })
 
-    // Comparação categorias (anterior vs atual)
-    const todasCats = new Set([...Object.keys(gastosPorCategoria), ...Object.keys(gastosPorCategoriaAnterior)])
+    // Gastos por categoria — dois meses atrás (para média 3 meses)
+    const gastosPorCategoriaDoisAtras = {}
+    despDoisAtras.forEach(d => {
+      let valor = d.total_value
+      if (d.installment > 1) valor = valor / d.installment
+      if (d.tem_pendencia && d.valor_pendente) valor -= d.valor_pendente
+      gastosPorCategoriaDoisAtras[d.label] = (gastosPorCategoriaDoisAtras[d.label] || 0) + valor
+    })
+    fixasDoisAtras.forEach(c => {
+      const rawCat = c.categoria || 'Contas'
+      const cat = catIds.has(rawCat) ? rawCat : 'Contas'
+      gastosPorCategoriaDoisAtras[cat] = (gastosPorCategoriaDoisAtras[cat] || 0) + (c.valor || 0)
+    })
+
+    // Gastos por categoria — três meses atrás (para média 3 meses)
+    const gastosPorCategoriaTresAtras = {}
+    despTresAtras.forEach(d => {
+      let valor = d.total_value
+      if (d.installment > 1) valor = valor / d.installment
+      if (d.tem_pendencia && d.valor_pendente) valor -= d.valor_pendente
+      gastosPorCategoriaTresAtras[d.label] = (gastosPorCategoriaTresAtras[d.label] || 0) + valor
+    })
+    fixasTresAtras.forEach(c => {
+      const rawCat = c.categoria || 'Contas'
+      const cat = catIds.has(rawCat) ? rawCat : 'Contas'
+      gastosPorCategoriaTresAtras[cat] = (gastosPorCategoriaTresAtras[cat] || 0) + (c.valor || 0)
+    })
+
+    // Comparação categorias (anterior vs atual + média 3 meses)
+    const todasCats = new Set([
+      ...Object.keys(gastosPorCategoria),
+      ...Object.keys(gastosPorCategoriaAnterior),
+      ...Object.keys(gastosPorCategoriaDoisAtras),
+      ...Object.keys(gastosPorCategoriaTresAtras),
+    ])
     const comparacaoCategorias = [...todasCats].map(cat => {
       const atual = gastosPorCategoria[cat] || 0
       const anterior = gastosPorCategoriaAnterior[cat] || 0
       const variacao = anterior > 0 ? ((atual - anterior) / anterior) * 100 : (atual > 0 ? 100 : 0)
-      return { categoria: cat, atual, anterior, variacao }
+      const media3meses = ((gastosPorCategoriaAnterior[cat] || 0) + (gastosPorCategoriaDoisAtras[cat] || 0) + (gastosPorCategoriaTresAtras[cat] || 0)) / 3
+      const variacaoMedia = media3meses > 0 ? ((atual - media3meses) / media3meses) * 100 : (atual > 0 ? 100 : 0)
+      return { categoria: cat, atual, anterior, variacao, media3meses, variacaoMedia }
     }).filter(c => c.atual > 0 || c.anterior > 0)
       .sort((a, b) => b.variacao - a.variacao)
 
@@ -623,28 +662,72 @@ export default function RelatorioPage({ user, outro, colors, refreshKey, trigger
       {metricas.comparacaoCategorias?.length > 0 && (
         <div className="bg-base-700/50 backdrop-blur-sm border border-white/5 rounded-3xl p-5">
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm font-medium text-white/50">📈 vs Mês Anterior</span>
+            <TrendingUp size={15} className="text-white/40" />
+            <p className="text-sm font-medium text-white/50">Variação por Categoria</p>
           </div>
-          <div className="space-y-3">
+
+          {/* Cabeçalho das colunas */}
+          <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 pb-2 mb-1 border-b border-white/5">
+            <span />
+            <div className="flex justify-end w-24">
+              <svg width="28" height="10" viewBox="0 0 28 10" fill="none" className="text-white/30">
+                <circle cx="4" cy="5" r="2.5" fill="currentColor"/>
+                <line x1="8" y1="5" x2="27" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div className="flex justify-end w-24">
+              <svg width="48" height="10" viewBox="0 0 48 10" fill="none" className="text-white/30">
+                <circle cx="4" cy="5" r="2" fill="currentColor" opacity="0.5"/>
+                <line x1="8" y1="5" x2="14" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+                <circle cx="18" cy="5" r="2" fill="currentColor" opacity="0.7"/>
+                <line x1="22" y1="5" x2="28" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.7"/>
+                <circle cx="32" cy="5" r="2.5" fill="currentColor"/>
+                <line x1="36" y1="5" x2="47" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <div className="divide-y divide-white/[0.04]">
             {metricas.comparacaoCategorias.map(c => {
               const catInfo = CATEGORIAS.find(cat => cat.id === c.categoria)
+
               const isUp = c.variacao > 0
               const isNew = c.anterior === 0 && c.atual > 0
               const isGone = c.anterior > 0 && c.atual === 0
               const varColor = isNew ? 'text-amber-400' : isGone ? 'text-mint-400' : isUp ? 'text-coral-400' : c.variacao < 0 ? 'text-mint-400' : 'text-white/40'
+
+              const isUpMedia = c.variacaoMedia > 0
+              const isNewMedia = c.media3meses === 0 && c.atual > 0
+              const varColorMedia = isNewMedia ? 'text-amber-400' : isUpMedia ? 'text-coral-400' : c.variacaoMedia < 0 ? 'text-mint-400' : 'text-white/40'
+
               return (
-                <div key={c.categoria} className="flex items-center justify-between">
+                <div key={c.categoria} className="grid grid-cols-[1fr_auto_auto] gap-x-4 items-center py-1.5">
+                  {/* Categoria */}
                   <div className="flex items-center gap-2 min-w-0">
-                    <CategoryIcon category={catInfo?.id || 'Outros'} size={16} className="text-white/60" />
-                    <span className="text-white text-xs font-medium truncate">{catInfo?.label || c.categoria}</span>
+                    <CategoryIcon category={catInfo?.id || 'Outros'} size={15} className="text-white/50 shrink-0" />
+                    <span className="text-white/80 text-xs font-medium truncate">{catInfo?.label || c.categoria}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-white/40 text-[10px]">{fmt(c.anterior)}</span>
-                    <span className={`text-[10px] ${varColor}`}>{isUp ? '↑' : '↓'}</span>
-                    <span className="text-white text-[10px] font-medium">{fmt(c.atual)}</span>
-                    <span className={`text-[10px] font-medium ${varColor}`}>
-                      ({isNew ? 'Novo' : isGone ? '-100%' : `${c.variacao > 0 ? '+' : ''}${c.variacao.toFixed(0)}%`})
-                    </span>
+
+                  {/* vs Mês anterior */}
+                  <div className="text-right w-24">
+                    <p className={`text-xs font-semibold ${varColor}`}>
+                      {isNew ? 'Novo' : isGone ? '−100%' : `${c.variacao > 0 ? '+' : ''}${c.variacao.toFixed(0)}%`}
+                    </p>
+                    <p className="text-white/25 text-[10px] whitespace-nowrap">{fmt(c.anterior)} → {fmt(c.atual)}</p>
+                  </div>
+
+                  {/* vs Média 3 meses */}
+                  <div className="text-right w-24">
+                    {c.media3meses > 0 ? (
+                      <>
+                        <p className={`text-xs font-semibold ${varColorMedia}`}>
+                          {isNewMedia ? 'Novo' : `${c.variacaoMedia > 0 ? '+' : ''}${c.variacaoMedia.toFixed(0)}%`}
+                        </p>
+                        <p className="text-white/25 text-[10px] whitespace-nowrap">{fmt(c.media3meses)} → {fmt(c.atual)}</p>
+                      </>
+                    ) : (
+                      <p className="text-white/20 text-[10px]">—</p>
+                    )}
                   </div>
                 </div>
               )
