@@ -22,6 +22,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
   const [feedback, setFeedback] = useState(null)
   const [quitandoItem, setQuitandoItem] = useState(null) // { id, tipo, valor, nome }
   const [dataQuitacao, setDataQuitacao] = useState(getLocalDate())
+  const [valorPagamento, setValorPagamento] = useState(0)
 
   const pendentesRef = useRef(null)
   const emprestimosRef = useRef(null)
@@ -103,6 +104,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
   function abrirModalQuitacao(id, tipo, valor, nome) {
     setQuitandoItem({ id, tipo, valor, nome })
     setDataQuitacao(getLocalDate())
+    setValorPagamento(valor)
   }
 
   function fecharModalQuitacao() {
@@ -111,50 +113,33 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
 
   async function confirmarQuitacao() {
     if (!quitandoItem) return
+    const { id, tipo, valor } = quitandoItem
+    const pagamento = parseFloat(valorPagamento) || 0
+    if (pagamento <= 0) return
+
+    const isParcial = pagamento < valor - 0.001
+    const endpoint = tipo === 'emprestimo' ? '/api/emprestimos-terceiros' : '/api/dividas-terceiros'
+    const labelTipo = tipo === 'emprestimo' ? 'o' : 'a'
+
+    const updateData = isParcial
+      ? { _id: id, valor: parseFloat((valor - pagamento).toFixed(2)) }
+      : { _id: id, status: 'quitado', data_quitacao: dataQuitacao }
 
     try {
-      const { id, tipo } = quitandoItem
-
-      if (tipo === 'emprestimo') {
-        const res = await fetch('/api/emprestimos-terceiros', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            _id: id,
-            status: 'quitado',
-            data_quitacao: dataQuitacao
-          }),
-        })
-
-        if (res.ok) {
-          showFeedback('Empréstimo quitado!')
-          fecharModalQuitacao()
-          loadData()
-          triggerRefresh()
-        } else {
-          showFeedback('Erro ao quitar', true)
-        }
-      } else if (tipo === 'divida') {
-        const res = await fetch('/api/dividas-terceiros', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            _id: id,
-            status: 'quitado',
-            data_quitacao: dataQuitacao
-          }),
-        })
-
-        if (res.ok) {
-          showFeedback('Dívida quitada!')
-          fecharModalQuitacao()
-          loadData()
-          triggerRefresh()
-        } else {
-          showFeedback('Erro ao quitar', true)
-        }
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      })
+      if (res.ok) {
+        showFeedback(isParcial ? 'Baixa parcial registrada!' : `Quitad${labelTipo}!`)
+        fecharModalQuitacao()
+        loadData()
+        triggerRefresh()
+      } else {
+        showFeedback('Erro ao quitar', true)
       }
-    } catch (error) {
+    } catch {
       showFeedback('Erro ao quitar', true)
     }
   }
@@ -301,10 +286,28 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
               </button>
             </div>
 
-            <div className="bg-base-700/50 rounded-2xl p-4 border border-white/5">
-              <p className="text-white/40 text-xs mb-1">Valor</p>
-              <p className="text-mint-400 text-2xl font-bold">{fmt(quitandoItem.valor)}</p>
+            <div>
+              <label className="text-white/60 text-xs block mb-2">Valor pago</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={quitandoItem.valor}
+                value={valorPagamento}
+                onChange={(e) => setValorPagamento(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl bg-base-700 border border-white/10 text-white text-xl font-bold focus:border-mint-500/50 focus:ring-2 focus:ring-mint-500/20 outline-none transition-all"
+              />
+              <p className="text-white/40 text-xs mt-1">Total: {fmt(quitandoItem.valor)}</p>
             </div>
+
+            {parseFloat(valorPagamento) < quitandoItem.valor - 0.001 && parseFloat(valorPagamento) > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3">
+                <p className="text-amber-400 text-sm font-medium">
+                  Baixa parcial · Saldo restante: {fmt(quitandoItem.valor - parseFloat(valorPagamento))}
+                </p>
+                <p className="text-amber-400/60 text-xs mt-0.5">O registro continuará em aberto com o valor restante</p>
+              </div>
+            )}
 
             <div>
               <label className="text-white/60 text-xs block mb-2 flex items-center gap-2">
@@ -330,7 +333,7 @@ export default function AcertoPage({ user, outro, colors, refreshKey, triggerRef
                 onClick={confirmarQuitacao}
                 className="flex-1 py-3 rounded-2xl font-medium bg-mint-500 text-white hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-mint-500/20"
               >
-                Confirmar Quitação
+                {parseFloat(valorPagamento) < quitandoItem.valor - 0.001 ? 'Registrar Baixa Parcial' : 'Confirmar Quitação'}
               </button>
             </div>
           </div>

@@ -123,6 +123,8 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
   const [tipoCompra, setTipoCompra] = useState('Pra mim')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [splitMode, setSplitMode] = useState(false)
+  const [splitItems, setSplitItems] = useState([{ nome: '', categoria: tx?.suggestedCategory || 'Outros', valor }])
 
   const pagamento = extrairPagamento(tx?.paymentMethod, tx?.description, tx?.type)
   const dataLancamento = tx?.date ? tx.date.split('T')[0] : getLocalDate()
@@ -136,7 +138,76 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
   // É combustível se tem pedir_veiculo no template OU se a categoria é Combustivel
   const isCombustivel = mostrarVeiculo || categoria === 'Combustivel' || lugarMatch?.categoria === 'Combustivel'
 
+  function activateSplit() {
+    setSplitItems([{ nome: '', categoria: tx?.suggestedCategory || 'Outros', valor }])
+    setSplitMode(true)
+  }
+
+  function updateSplitItem(idx, field, val) {
+    setSplitItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it))
+  }
+
+  function addSplitItem() {
+    setSplitItems(prev => [...prev, { nome: '', categoria: 'Outros', valor: 0 }])
+  }
+
+  function removeSplitItem(idx) {
+    setSplitItems(prev => prev.filter((_, i) => i !== idx))
+  }
+
   async function handleSalvar() {
+    if (splitMode) {
+      const totalSplit = splitItems.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
+      if (Math.abs(totalSplit - valor) > 0.01) {
+        setError(`Total dos itens (${fmt(totalSplit)}) deve ser igual ao valor original (${fmt(valor)})`)
+        return
+      }
+      for (const it of splitItems) {
+        if (!it.nome.trim()) { setError('Preencha o nome de todos os itens'); return }
+      }
+
+      setSaving(true)
+      setError(null)
+      try {
+        for (const it of splitItems) {
+          const res = await fetch('/api/despesas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              label: it.categoria,
+              buyer: user,
+              item: it.nome.trim(),
+              description: tx?.description || '',
+              quantity: 1,
+              total_value: parseFloat(it.valor),
+              payment_method: pagamento,
+              installment: 0,
+              createdAt: dataLancamento,
+              pagamento_compartilhado: 'Pra mim',
+              tem_pendencia: false,
+              devedor: null,
+              valor_pendente: null,
+              status_pendencia: null,
+              uso_pessoal: false,
+              lugar_nome: lugarMatch?.nome || null,
+            }),
+          })
+          if (!res.ok) throw new Error('Erro ao criar despesa')
+        }
+        await fetch('/api/pluggy/transacoes', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _id: tx._id, status: 'lancado' }),
+        })
+        onSuccess()
+      } catch (err) {
+        setError(err.message || 'Erro ao salvar')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
     const itemFinal = isCombustivel
       ? veiculo
       : (tpl.pedir_item ? itemNome.trim() : nome.trim())
@@ -213,125 +284,230 @@ function LancarForm({ tx, user, outro, colors, nomeDefault, lugarMatch, onSucces
         </div>
       )}
 
-      {/* Nome da despesa (campo padrão — quando NÃO tem pedir_item separado) */}
-      {mostrarItem && !tpl.pedir_item && (
-        <div>
-          <label className="text-white/50 text-xs block mb-1.5">Nome da despesa</label>
-          <input
-            type="text"
-            value={nome}
-            onChange={e => setNome(e.target.value)}
-            autoFocus
-            className="w-full px-4 py-3 rounded-xl bg-base-800 border border-white/10 text-white text-base
-                       focus:border-white/30 outline-none placeholder-white/25 font-medium"
-            placeholder="Ex: Almoco, Combustivel, Tenis..."
-          />
-        </div>
-      )}
+      {!splitMode && (
+        <>
+          {/* Nome da despesa (campo padrão — quando NÃO tem pedir_item separado) */}
+          {mostrarItem && !tpl.pedir_item && (
+            <div>
+              <label className="text-white/50 text-xs block mb-1.5">Nome da despesa</label>
+              <input
+                type="text"
+                value={nome}
+                onChange={e => setNome(e.target.value)}
+                autoFocus
+                className="w-full px-4 py-3 rounded-xl bg-base-800 border border-white/10 text-white text-base
+                           focus:border-white/30 outline-none placeholder-white/25 font-medium"
+                placeholder="Ex: Almoco, Combustivel, Tenis..."
+              />
+            </div>
+          )}
 
-      {/* Campo "O que comprou?" — para marketplaces tipo Shopee */}
-      {tpl.pedir_item && (
-        <div>
-          <label className="text-white/50 text-xs block mb-1.5">
-            O que foi comprado? <span className="text-white/25">(em {lugarMatch?.nome || 'loja'})</span>
-          </label>
-          <input
-            type="text"
-            value={itemNome}
-            onChange={e => setItemNome(e.target.value)}
-            autoFocus
-            className="w-full px-4 py-3 rounded-xl bg-base-800 border border-white/10 text-white text-base
-                       focus:border-white/30 outline-none placeholder-white/25 font-medium"
-            placeholder="Ex: Capa celular, Fone bluetooth..."
-          />
-        </div>
-      )}
+          {/* Campo "O que comprou?" — para marketplaces tipo Shopee */}
+          {tpl.pedir_item && (
+            <div>
+              <label className="text-white/50 text-xs block mb-1.5">
+                O que foi comprado? <span className="text-white/25">(em {lugarMatch?.nome || 'loja'})</span>
+              </label>
+              <input
+                type="text"
+                value={itemNome}
+                onChange={e => setItemNome(e.target.value)}
+                autoFocus
+                className="w-full px-4 py-3 rounded-xl bg-base-800 border border-white/10 text-white text-base
+                           focus:border-white/30 outline-none placeholder-white/25 font-medium"
+                placeholder="Ex: Capa celular, Fone bluetooth..."
+              />
+            </div>
+          )}
 
-      {/* Veículo — para combustível */}
-      {isCombustivel && (
-        <div>
-          <label className="text-white/50 text-xs block mb-1.5">Veiculo</label>
+          {/* Veículo — para combustível */}
+          {isCombustivel && (
+            <div>
+              <label className="text-white/50 text-xs block mb-1.5">Veiculo</label>
+              <div className="flex gap-2">
+                {[
+                  { id: 'Moto', icon: <Bike size={14} /> },
+                  { id: 'Carro', icon: <Car size={14} /> },
+                ].map(v => (
+                  <button
+                    key={v.id}
+                    onClick={() => setVeiculo(v.id)}
+                    className={`flex-1 py-3 rounded-xl text-sm font-medium border transition-colors flex items-center justify-center gap-1.5
+                      ${veiculo === v.id
+                        ? 'bg-white/15 border-white/20 text-white'
+                        : 'bg-transparent border-white/10 text-white/40 hover:text-white/60'
+                      }`}
+                  >
+                    {v.icon} {v.id}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Uso pessoal — para combustível */}
+          {(isCombustivel || mostrarUsoPessoal) && (
+            <button
+              onClick={() => setUsoPessoal(!usoPessoal)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors
+                ${usoPessoal
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                  : 'bg-transparent border-white/10 text-white/40 hover:text-white/60'
+                }`}
+            >
+              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
+                ${usoPessoal ? 'bg-amber-500 border-amber-500' : 'border-white/20'}`}>
+                {usoPessoal && <Check size={12} className="text-white" />}
+              </div>
+              <span className="text-sm font-medium">Uso pessoal (nao entra no relatorio)</span>
+            </button>
+          )}
+
+          {/* Categoria — só mostra se NÃO for combustível (que já tem categoria fixa) */}
+          {!isCombustivel && (
+            <div>
+              <label className="text-white/50 text-xs block mb-1.5">Categoria</label>
+              <select value={categoria} onChange={e => setCategoria(e.target.value)} className={SELECT_CLASS}>
+                {CATEGORIAS.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.emoji} {cat.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Tipo de compra — sempre visível */}
+          <div>
+            <label className="text-white/50 text-xs block mb-1.5">Tipo de compra</label>
+            <select value={tipoCompra} onChange={e => setTipoCompra(e.target.value)} className={SELECT_CLASS}>
+              <option value="Pra mim">Pra mim</option>
+              <option value="Dividido (me deve metade)">Dividido (me deve metade)</option>
+              <option value="Pra outra (me deve tudo)">Pra outra (me deve tudo)</option>
+            </select>
+          </div>
+
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+
+          <button
+            type="button"
+            onClick={activateSplit}
+            className="w-full py-2 text-white/35 text-xs border border-dashed border-white/10 rounded-xl hover:border-white/20 hover:text-white/55 transition-colors"
+          >
+            + Dividir em mais de um item
+          </button>
+
           <div className="flex gap-2">
-            {[
-              { id: 'Moto', icon: <Bike size={14} /> },
-              { id: 'Carro', icon: <Car size={14} /> },
-            ].map(v => (
-              <button
-                key={v.id}
-                onClick={() => setVeiculo(v.id)}
-                className={`flex-1 py-3 rounded-xl text-sm font-medium border transition-colors flex items-center justify-center gap-1.5
-                  ${veiculo === v.id
-                    ? 'bg-white/15 border-white/20 text-white'
-                    : 'bg-transparent border-white/10 text-white/40 hover:text-white/60'
-                  }`}
+            <button
+              onClick={handleSalvar}
+              disabled={saving}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium
+                          bg-gradient-to-r ${colors.gradient} text-white hover:opacity-90 transition-opacity disabled:opacity-50`}
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+            <button
+              onClick={onCancel}
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 text-sm
+                         hover:bg-white/10 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </>
+      )}
+
+      {splitMode && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-white/50 text-xs font-medium">Dividindo {fmt(valor)}</span>
+            <button
+              type="button"
+              onClick={() => setSplitMode(false)}
+              className="text-white/30 text-xs hover:text-white/60 transition-colors"
+            >
+              Cancelar divisão
+            </button>
+          </div>
+
+          {splitItems.map((item, idx) => (
+            <div key={idx} className="p-3 bg-white/[0.03] border border-white/[0.08] rounded-xl space-y-2">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={item.nome}
+                  onChange={e => updateSplitItem(idx, 'nome', e.target.value)}
+                  placeholder="Nome do item"
+                  autoFocus={idx === 0}
+                  className="flex-1 px-3 py-2 rounded-lg bg-base-800 border border-white/10 text-white text-sm focus:border-white/25 outline-none placeholder-white/20"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={item.valor}
+                  onChange={e => updateSplitItem(idx, 'valor', e.target.value)}
+                  className="w-24 px-3 py-2 rounded-lg bg-base-800 border border-white/10 text-white text-sm focus:border-white/25 outline-none text-right"
+                />
+                {splitItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeSplitItem(idx)}
+                    className="text-white/20 hover:text-red-400 transition-colors shrink-0"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <select
+                value={item.categoria}
+                onChange={e => updateSplitItem(idx, 'categoria', e.target.value)}
+                className={SELECT_CLASS}
               >
-                {v.icon} {v.id}
-              </button>
-            ))}
+                {CATEGORIAS.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.emoji} {cat.label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+
+          {(() => {
+            const total = splitItems.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
+            const restante = valor - total
+            return (
+              <div className={`flex justify-between text-xs px-1 ${Math.abs(restante) < 0.01 ? 'text-green-400' : restante < 0 ? 'text-red-400' : 'text-amber-400'}`}>
+                <span>Total: {fmt(total)}</span>
+                <span>{Math.abs(restante) < 0.01 ? '✓ Exato' : `Restante: ${fmt(restante)}`}</span>
+              </div>
+            )
+          })()}
+
+          <button
+            type="button"
+            onClick={addSplitItem}
+            className="w-full py-2 text-white/35 text-xs border border-dashed border-white/10 rounded-xl hover:border-white/20 hover:text-white/55 transition-colors"
+          >
+            + Adicionar item
+          </button>
+
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleSalvar}
+              disabled={saving}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r ${colors.gradient} text-white hover:opacity-90 transition-opacity disabled:opacity-50`}
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {saving ? 'Salvando...' : `Salvar ${splitItems.length} itens`}
+            </button>
+            <button
+              onClick={onCancel}
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 text-sm hover:bg-white/10 transition-colors"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}
-
-      {/* Uso pessoal — para combustível */}
-      {(isCombustivel || mostrarUsoPessoal) && (
-        <button
-          onClick={() => setUsoPessoal(!usoPessoal)}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors
-            ${usoPessoal
-              ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-              : 'bg-transparent border-white/10 text-white/40 hover:text-white/60'
-            }`}
-        >
-          <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
-            ${usoPessoal ? 'bg-amber-500 border-amber-500' : 'border-white/20'}`}>
-            {usoPessoal && <Check size={12} className="text-white" />}
-          </div>
-          <span className="text-sm font-medium">Uso pessoal (nao entra no relatorio)</span>
-        </button>
-      )}
-
-      {/* Categoria — só mostra se NÃO for combustível (que já tem categoria fixa) */}
-      {!isCombustivel && (
-        <div>
-          <label className="text-white/50 text-xs block mb-1.5">Categoria</label>
-          <select value={categoria} onChange={e => setCategoria(e.target.value)} className={SELECT_CLASS}>
-            {CATEGORIAS.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.emoji} {cat.label}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Tipo de compra — sempre visível */}
-      <div>
-        <label className="text-white/50 text-xs block mb-1.5">Tipo de compra</label>
-        <select value={tipoCompra} onChange={e => setTipoCompra(e.target.value)} className={SELECT_CLASS}>
-          <option value="Pra mim">Pra mim</option>
-          <option value="Dividido (me deve metade)">Dividido (me deve metade)</option>
-          <option value="Pra outra (me deve tudo)">Pra outra (me deve tudo)</option>
-        </select>
-      </div>
-
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-
-      <div className="flex gap-2">
-        <button
-          onClick={handleSalvar}
-          disabled={saving}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium
-                      bg-gradient-to-r ${colors.gradient} text-white hover:opacity-90 transition-opacity disabled:opacity-50`}
-        >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-          {saving ? 'Salvando...' : 'Salvar'}
-        </button>
-        <button
-          onClick={onCancel}
-          className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 text-sm
-                     hover:bg-white/10 transition-colors"
-        >
-          Cancelar
-        </button>
-      </div>
     </div>
   )
 }
